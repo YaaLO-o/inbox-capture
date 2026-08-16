@@ -71,20 +71,26 @@ async function runSmokeTest() {
     throw new Error('缺少 UNIVERSAL_CAPTURE_SMOKE_PATH');
   }
 
-  clipboard.writeText(smokeText);
-  const result = await captureCurrentClipboard({
-    readText: () => clipboard.readText(),
-    append: appendCapture,
-    filePath,
-    now: () => new Date(2026, 7, 16, 16, 0, 0)
-  });
-  const markdown = await fs.readFile(filePath, 'utf8');
+  const originalText = clipboard.readText();
 
-  if (result.status !== 'saved' || !markdown.includes(smokeText)) {
-    throw new Error('剪贴板到 Markdown 的验证结果不正确');
+  try {
+    clipboard.writeText(smokeText);
+    const result = await captureCurrentClipboard({
+      readText: () => clipboard.readText(),
+      append: appendCapture,
+      filePath,
+      now: () => new Date(2026, 7, 16, 16, 0, 0)
+    });
+    const markdown = await fs.readFile(filePath, 'utf8');
+
+    if (result.status !== 'saved' || !markdown.includes(smokeText)) {
+      throw new Error('剪贴板到 Markdown 的验证结果不正确');
+    }
+
+    console.log(`SMOKE_OK ${filePath}`);
+  } finally {
+    clipboard.writeText(originalText);
   }
-
-  console.log(`SMOKE_OK ${filePath}`);
 }
 
 app.whenReady().then(async () => {
