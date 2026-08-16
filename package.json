@@ -1,0 +1,15 @@
+{
+  "name": "universal-capture",
+  "version": "0.1.0",
+  "private": true,
+  "description": "本地优先的桌面文本采集工具",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "smoke": "electron . --smoke-test"
+  },
+  "devDependencies": {
+    "electron": "^43.4.0"
+  }
+}
