@@ -13,7 +13,7 @@
 - Windows 优先验证，但不使用 Windows 独占接口。
 - 不包含 AI、云同步、账号、分类、OCR、链接解析、后台监听和遥测。
 - 只有用户主动点击时读取剪贴板。
-- 默认保存到当前 Obsidian 仓库内的 `Universal Capture\captures.md`，使用 UTF-8。
+- 默认保存到当前 Obsidian 仓库内的 `Universal Capture\YYYY-MM-DD.md`，使用 UTF-8，每个本地自然日一个文件。
 - 找不到可用 Obsidian 仓库时明确报错，不回退到仓库外的位置。
 - 渲染进程启用上下文隔离并关闭 Node.js 集成。
 - 所有用户可见文案和说明使用中文。
@@ -139,11 +139,11 @@ Commit: `git commit -m "feat: add clipboard capture service"`
 - Create: `src/obsidian-vault.js`
 
 **Interfaces:**
-- Produces: `resolveObsidianCapturePath({ configPath }): Promise<string>`
+- Produces: `resolveObsidianCapturePath({ configPath, capturedAt }): Promise<string>`
 
 - [ ] **Step 1：先写配置解析的失败测试**
 
-使用真实临时目录建立 Obsidian 配置和仓库文件夹，验证优先选择 `open: true` 且真实存在的仓库，并返回 `<仓库>\Universal Capture\captures.md`。另写配置不存在、JSON 无效、没有真实存在仓库三个测试，均断言拒绝并包含“未找到 Obsidian 仓库”。
+使用真实临时目录建立 Obsidian 配置和仓库文件夹，验证优先选择 `open: true` 且真实存在的仓库，并按 `capturedAt` 返回 `<仓库>\Universal Capture\YYYY-MM-DD.md`。验证相邻两天生成不同路径。另写配置不存在、JSON 无效、没有真实存在仓库三个测试，均断言拒绝并包含“未找到 Obsidian 仓库”。
 
 - [ ] **Step 2：确认测试因模块缺失而失败**
 
@@ -153,13 +153,13 @@ Expected: FAIL，包含 `Cannot find module '../src/obsidian-vault'`。
 
 - [ ] **Step 3：实现最小仓库定位逻辑**
 
-读取并解析配置中的 `vaults` 对象，对路径执行 `fs.access`；先选 `open: true` 的存在目录，否则选第一个存在目录。没有可用目录时抛出 `new Error('未找到 Obsidian 仓库')`，成功时返回 `path.join(vaultPath, 'Universal Capture', 'captures.md')`。
+读取并解析配置中的 `vaults` 对象，对路径执行 `fs.stat`；先选 `open: true` 的存在目录，否则选第一个存在目录。没有可用目录时抛出 `new Error('未找到 Obsidian 仓库')`，成功时按照本地日期返回 `path.join(vaultPath, 'Universal Capture', 'YYYY-MM-DD.md')`。
 
 - [ ] **Step 4：运行全部测试并提交**
 
 Run: `npm test`
 
-Expected: 10 tests passed，0 failed。
+Expected: 11 tests passed，0 failed。
 
 Commit: `git commit -m "feat: save captures inside Obsidian vault"`
 
@@ -188,7 +188,7 @@ Commit: `git commit -m "feat: save captures inside Obsidian vault"`
 
 - [ ] **Step 3：实现中文悬浮界面**
 
-外层使用 `-webkit-app-region: drag`，圆形按钮使用 `no-drag`。默认显示“收”和“点击保存”。点击时禁用按钮，调用桥接方法，将 `saved`、`empty`、`error`、`vault-not-found` 映射为“已保存”“剪贴板没有文本”“保存失败”“未找到 Obsidian 仓库”，1200 毫秒后恢复。
+顶部显示“•••”把手。按住把手移动时，渲染进程通过受限 `window:move` IPC 将屏幕坐标发送给主进程，主进程只移动发起请求的当前窗口。圆形按钮仍只负责保存。默认显示“收”和“点击保存”；点击时禁用按钮，调用桥接方法，将 `saved`、`empty`、`error`、`vault-not-found` 映射为“已保存”“剪贴板没有文本”“保存失败”“未找到 Obsidian 仓库”，1200 毫秒后恢复。
 
 - [ ] **Step 4：验证并提交桌面入口**
 

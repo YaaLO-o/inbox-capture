@@ -1,5 +1,6 @@
 const button = document.querySelector('#capture-button');
 const status = document.querySelector('#status');
+const dragHandle = document.querySelector('.drag-handle');
 
 const messages = {
   saved: '已保存',
@@ -7,6 +8,40 @@ const messages = {
   error: '保存失败',
   'vault-not-found': '未找到 Obsidian 仓库'
 };
+
+let dragState = null;
+
+dragHandle.addEventListener('pointerdown', (event) => {
+  if (event.button !== 0) return;
+
+  dragState = {
+    pointerId: event.pointerId,
+    offsetX: event.clientX,
+    offsetY: event.clientY
+  };
+  dragHandle.setPointerCapture(event.pointerId);
+});
+
+dragHandle.addEventListener('pointermove', (event) => {
+  if (!dragState || event.pointerId !== dragState.pointerId) return;
+
+  window.universalCapture.moveWindow(
+    event.screenX - dragState.offsetX,
+    event.screenY - dragState.offsetY
+  );
+});
+
+function finishDragging(event) {
+  if (!dragState || event.pointerId !== dragState.pointerId) return;
+
+  if (dragHandle.hasPointerCapture(event.pointerId)) {
+    dragHandle.releasePointerCapture(event.pointerId);
+  }
+  dragState = null;
+}
+
+dragHandle.addEventListener('pointerup', finishDragging);
+dragHandle.addEventListener('pointercancel', finishDragging);
 
 button.addEventListener('click', async () => {
   if (button.disabled) return;

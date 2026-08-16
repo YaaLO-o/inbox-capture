@@ -26,23 +26,23 @@ npm install
 npm start
 ```
 
-启动后，桌面会出现一个始终置顶的小圆形悬浮入口。拖动按钮周围的空白区域可以调整位置，关闭悬浮窗口即可退出应用。
+启动后，桌面会出现一个始终置顶的小圆形悬浮入口。按住按钮顶部的“•••”把手即可拖动，关闭悬浮窗口即可退出应用。
 
 ## 保存位置
 
 应用读取 Obsidian 的本地配置，优先选择当前打开且真实存在的仓库。采集内容保存到：
 
 ```text
-<Obsidian 仓库>\Universal Capture\captures.md
+<Obsidian 仓库>\Universal Capture\YYYY-MM-DD.md
 ```
 
 例如，这台开发电脑当前会保存到：
 
 ```text
-C:\Users\Yangy\Documents\Obsidian Vault\Universal Capture\captures.md
+C:\Users\Yangy\Documents\Obsidian Vault\Universal Capture\2026-08-16.md
 ```
 
-如果 `Universal Capture` 文件夹或 `captures.md` 不存在，第一次成功采集时会自动创建。每条内容使用以下格式追加：
+如果 `Universal Capture` 文件夹或当天文件不存在，第一次成功采集时会自动创建。同一天的所有内容追加到同一个文件；进入第二天后，自动创建新的日期文件。每条内容使用以下格式追加：
 
 ```markdown
 ## 2026-08-16 14:30:00

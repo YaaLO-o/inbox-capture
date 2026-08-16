@@ -33,17 +33,19 @@ function createWindow() {
   window.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
 
-async function resolveDefaultCapturePath() {
+async function resolveDefaultCapturePath(capturedAt) {
   return resolveObsidianCapturePath({
-    configPath: path.join(app.getPath('appData'), 'obsidian', 'obsidian.json')
+    configPath: path.join(app.getPath('appData'), 'obsidian', 'obsidian.json'),
+    capturedAt
   });
 }
 
 async function captureToObsidian() {
   let filePath;
+  const capturedAt = new Date();
 
   try {
-    filePath = await resolveDefaultCapturePath();
+    filePath = await resolveDefaultCapturePath(capturedAt);
   } catch (error) {
     return {
       status: 'vault-not-found',
@@ -55,12 +57,21 @@ async function captureToObsidian() {
     readText: () => clipboard.readText(),
     append: appendCapture,
     filePath,
-    now: () => new Date()
+    now: () => capturedAt
   });
 }
 
 function registerCaptureHandler() {
   ipcMain.handle('capture:clipboard', captureToObsidian);
+  ipcMain.on('window:move', (event, position) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const x = Number(position?.x);
+    const y = Number(position?.y);
+
+    if (window && Number.isFinite(x) && Number.isFinite(y)) {
+      window.setPosition(Math.round(x), Math.round(y), false);
+    }
+  });
 }
 
 async function runSmokeTest() {

@@ -24,8 +24,32 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 4px;
   -webkit-app-region: drag;
+}
+
+.drag-handle {
+  width: 44px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  color: rgba(68, 54, 110, 0.75);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 2px 8px rgba(55, 39, 104, 0.14);
+  cursor: grab;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 2px;
+  touch-action: none;
+  -webkit-app-region: no-drag;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .capture-button {

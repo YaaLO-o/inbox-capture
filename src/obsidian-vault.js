@@ -3,6 +3,14 @@ const path = require('node:path');
 
 const VAULT_NOT_FOUND_MESSAGE = '未找到 Obsidian 仓库';
 
+function twoDigits(value) {
+  return String(value).padStart(2, '0');
+}
+
+function formatDate(date) {
+  return `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())}`;
+}
+
 async function readVaultConfig(configPath) {
   try {
     return JSON.parse(await fs.readFile(configPath, 'utf8'));
@@ -29,7 +37,7 @@ async function existingVaults(vaults) {
   return available;
 }
 
-async function resolveObsidianCapturePath({ configPath }) {
+async function resolveObsidianCapturePath({ configPath, capturedAt = new Date() }) {
   const config = await readVaultConfig(configPath);
   const vaults = await existingVaults(config.vaults);
   const selected = vaults.find((vault) => vault.open === true) || vaults[0];
@@ -38,7 +46,7 @@ async function resolveObsidianCapturePath({ configPath }) {
     throw new Error(VAULT_NOT_FOUND_MESSAGE);
   }
 
-  return path.join(selected.path, 'Universal Capture', 'captures.md');
+  return path.join(selected.path, 'Universal Capture', `${formatDate(capturedAt)}.md`);
 }
 
 module.exports = { resolveObsidianCapturePath };
