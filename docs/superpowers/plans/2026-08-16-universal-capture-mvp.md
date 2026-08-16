@@ -13,7 +13,8 @@
 - Windows 优先验证，但不使用 Windows 独占接口。
 - 不包含 AI、云同步、账号、分类、OCR、链接解析、后台监听和遥测。
 - 只有用户主动点击时读取剪贴板。
-- 默认保存到 `%USERPROFILE%\Documents\Universal Capture\captures.md`，使用 UTF-8。
+- 默认保存到当前 Obsidian 仓库内的 `Universal Capture\captures.md`，使用 UTF-8。
+- 找不到可用 Obsidian 仓库时明确报错，不回退到仓库外的位置。
 - 渲染进程启用上下文隔离并关闭 Node.js 集成。
 - 所有用户可见文案和说明使用中文。
 
@@ -24,6 +25,7 @@
 - `package.json`：项目命令和 Electron 依赖。
 - `src/capture-store.js`：验证文本、格式化记录并追加 Markdown。
 - `src/capture-service.js`：协调剪贴板读取与写入。
+- `src/obsidian-vault.js`：读取 Obsidian 配置并生成仓库内保存路径。
 - `src/main.js`：Electron 生命周期、窗口、IPC 和冒烟模式。
 - `src/preload.js`：安全地开放采集方法。
 - `src/renderer/*`：悬浮入口和反馈。
@@ -130,7 +132,38 @@ Expected: 6 tests passed，0 failed。
 
 Commit: `git commit -m "feat: add clipboard capture service"`
 
-### Task 3：Electron 悬浮入口
+### Task 3：定位 Obsidian 仓库
+
+**Files:**
+- Create: `tests/obsidian-vault.test.js`
+- Create: `src/obsidian-vault.js`
+
+**Interfaces:**
+- Produces: `resolveObsidianCapturePath({ configPath }): Promise<string>`
+
+- [ ] **Step 1：先写配置解析的失败测试**
+
+使用真实临时目录建立 Obsidian 配置和仓库文件夹，验证优先选择 `open: true` 且真实存在的仓库，并返回 `<仓库>\Universal Capture\captures.md`。另写配置不存在、JSON 无效、没有真实存在仓库三个测试，均断言拒绝并包含“未找到 Obsidian 仓库”。
+
+- [ ] **Step 2：确认测试因模块缺失而失败**
+
+Run: `npm test -- tests/obsidian-vault.test.js`
+
+Expected: FAIL，包含 `Cannot find module '../src/obsidian-vault'`。
+
+- [ ] **Step 3：实现最小仓库定位逻辑**
+
+读取并解析配置中的 `vaults` 对象，对路径执行 `fs.access`；先选 `open: true` 的存在目录，否则选第一个存在目录。没有可用目录时抛出 `new Error('未找到 Obsidian 仓库')`，成功时返回 `path.join(vaultPath, 'Universal Capture', 'captures.md')`。
+
+- [ ] **Step 4：运行全部测试并提交**
+
+Run: `npm test`
+
+Expected: 10 tests passed，0 failed。
+
+Commit: `git commit -m "feat: save captures inside Obsidian vault"`
+
+### Task 4：Electron 悬浮入口
 
 **Files:**
 - Create: `src/main.js`
@@ -149,13 +182,13 @@ Commit: `git commit -m "feat: add clipboard capture service"`
 
 - [ ] **Step 2：实现主进程和真实保存路径**
 
-`src/main.js` 创建 116×132、透明、无边框、始终置顶、不可缩放且不显示在任务栏的窗口。启用 `contextIsolation: true`、`nodeIntegration: false`。IPC 处理器使用 `clipboard.readText()`，保存路径通过 `path.join(app.getPath('documents'), 'Universal Capture', 'captures.md')` 得到。
+`src/main.js` 创建 116×132、透明、无边框、始终置顶、不可缩放且不显示在任务栏的窗口。启用 `contextIsolation: true`、`nodeIntegration: false`。IPC 处理器使用 `clipboard.readText()`，并通过 `resolveObsidianCapturePath` 获取保存路径。无法定位仓库时返回 `vault-not-found` 结果。
 
 冒烟模式检测 `--smoke-test`：把“通用采集器冒烟测试”写入 Electron 剪贴板，通过同一个 `captureCurrentClipboard` 写到 `UNIVERSAL_CAPTURE_SMOKE_PATH`，读取文件确认文本后输出 `SMOKE_OK` 并退出；错误时设置非零退出状态。
 
 - [ ] **Step 3：实现中文悬浮界面**
 
-外层使用 `-webkit-app-region: drag`，圆形按钮使用 `no-drag`。默认显示“收”和“点击保存”。点击时禁用按钮，调用桥接方法，将 `saved`、`empty`、`error` 映射为“已保存”“剪贴板没有文本”“保存失败”，1200 毫秒后恢复。
+外层使用 `-webkit-app-region: drag`，圆形按钮使用 `no-drag`。默认显示“收”和“点击保存”。点击时禁用按钮，调用桥接方法，将 `saved`、`empty`、`error`、`vault-not-found` 映射为“已保存”“剪贴板没有文本”“保存失败”“未找到 Obsidian 仓库”，1200 毫秒后恢复。
 
 - [ ] **Step 4：验证并提交桌面入口**
 
@@ -169,7 +202,7 @@ Expected: Windows 桌面出现可拖动的置顶悬浮入口，关闭窗口后�
 
 Commit: `git commit -m "feat: add floating Electron capture entry"`
 
-### Task 4：真实剪贴板冒烟验证与中文说明
+### Task 5：真实剪贴板冒烟验证与中文说明
 
 **Files:**
 - Create: `README.md`
