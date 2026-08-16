@@ -1,0 +1,98 @@
+:root {
+  color-scheme: light;
+  font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+}
+
+.widget {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  -webkit-app-region: drag;
+}
+
+.capture-button {
+  width: 78px;
+  height: 78px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  color: #3c2f68;
+  background: linear-gradient(145deg, #fff7d6, #ffd98c);
+  box-shadow: 0 8px 24px rgba(55, 39, 104, 0.24);
+  cursor: pointer;
+  transition: transform 120ms ease, filter 120ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.capture-button:hover {
+  filter: brightness(1.04);
+  transform: translateY(-2px);
+}
+
+.capture-button:active {
+  transform: scale(0.96);
+}
+
+.capture-button:focus-visible {
+  outline: 3px solid rgba(99, 77, 171, 0.5);
+  outline-offset: 3px;
+}
+
+.capture-button:disabled {
+  cursor: wait;
+  filter: saturate(0.75);
+}
+
+.pet-face {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.pet-eyes {
+  margin-bottom: 7px;
+  font-size: 17px;
+  letter-spacing: 2px;
+}
+
+.pet-label {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.status {
+  max-width: 112px;
+  min-height: 20px;
+  margin: 0;
+  padding: 3px 8px;
+  overflow: hidden;
+  border-radius: 10px;
+  color: #44366e;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 3px 12px rgba(55, 39, 104, 0.15);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

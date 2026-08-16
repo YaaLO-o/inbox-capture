@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:"
+    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Capture</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="renderer.js" defer></script>
+  </head>
+  <body>
+    <main class="widget" aria-label="Universal Capture 悬浮采集器">
+      <button id="capture-button" class="capture-button" type="button" aria-label="保存当前剪贴板文本">
+        <span class="pet-face" aria-hidden="true">
+          <span class="pet-eyes">•&nbsp;&nbsp;•</span>
+          <span class="pet-label">收</span>
+        </span>
+      </button>
+      <p id="status" class="status" aria-live="polite">点击保存</p>
+    </main>
+  </body>
+</html>
