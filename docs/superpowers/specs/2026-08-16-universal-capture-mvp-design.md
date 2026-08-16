@@ -1,94 +1,94 @@
-# Universal Capture Windows MVP Design
+# Universal Capture Windows 最小版本设计说明
 
-## Goal
+## 项目目标
 
-Build the smallest useful desktop capture loop for Windows: the user copies text in any application, clicks a small always-on-top floating control, and the application appends the clipboard text to a local Markdown file with immediate feedback.
+为 Windows 构建一个最小但真正可用的桌面采集闭环：用户在任意应用中复制文本，点击桌面上的悬浮入口，应用读取剪贴板内容，并将其追加写入本地 Markdown 文件，同时给出轻量反馈。
 
-This version validates capture speed and reliability. It does not include AI processing, cloud sync, accounts, categories, OCR, links, or clipboard history.
+这一版本只验证采集动作是否足够快速、稳定。暂不包含 AI 处理、云同步、账号、复杂分类、图片文字识别、链接解析和剪贴板历史。
 
-## Platform and technology
+## 平台与技术选择
 
-- Electron with plain HTML, CSS, and JavaScript.
-- Windows is the validation platform; the implementation avoids Windows-only APIs so a later macOS build can reuse it.
-- Node.js built-in modules handle local filesystem writes.
-- Electron owns clipboard access and the floating window lifecycle.
+- 使用 Electron、原生 HTML、CSS 和 JavaScript。
+- 首先在 Windows 上验证，但避免使用 Windows 独占接口，以便以后复用代码支持 macOS。
+- 使用 Node.js 内置模块完成本地文件写入。
+- 由 Electron 管理剪贴板读取、悬浮窗口和应用生命周期。
 
-Electron is selected because Node.js is already installed, it supports the required desktop and clipboard APIs, and it provides a direct path to macOS. WPF would be more native but Windows-specific. Tauri would produce a smaller package but requires a Rust toolchain that is not currently installed.
+选择 Electron 是因为电脑上已经安装 Node.js，它直接提供桌面窗口和剪贴板能力，也能继续支持 macOS。WPF 的 Windows 原生体验更好，但以后支持 macOS 基本需要重写。Tauri 打包体积更小，但当前电脑尚未安装 Rust 开发环境。
 
-## User experience
+## 用户使用流程
 
-1. Launching the app displays a compact, frameless, always-on-top floating window.
-2. The window can be dragged to a convenient screen position.
-3. Clicking the capture button reads the current text clipboard.
-4. When text exists, the app appends it to the Markdown file and briefly displays `已保存`.
-5. When the clipboard has no text, it briefly displays `剪贴板没有文本` and writes nothing.
-6. When writing fails, it displays `保存失败` without crashing.
+1. 启动应用后，桌面上显示一个小型、无边框、始终置顶的悬浮窗口。
+2. 用户可以将悬浮窗口拖动到合适的位置。
+3. 点击采集按钮后，应用读取当前文本剪贴板。
+4. 如果剪贴板中存在文本，应用将其追加写入 Markdown 文件，并短暂显示“已保存”。
+5. 如果剪贴板中没有文本，应用显示“剪贴板没有文本”，且不写入文件。
+6. 如果文件写入失败，应用显示“保存失败”，但不会崩溃退出。
 
-The MVP has no settings screen. Closing the floating window exits the application. A keyboard shortcut, tray icon, auto-start behavior, packaging installer, and custom desktop-pet artwork are outside this version.
+最小版本不提供设置页面。关闭悬浮窗口即退出应用。全局快捷键、系统托盘、自启动、安装包和自定义桌宠形象不在本次范围内。
 
-## Storage
+## 本地存储
 
-The capture file is:
+默认采集文件为：
 
 `%USERPROFILE%\Documents\Universal Capture\captures.md`
 
-The application creates the folder and file when needed. Each capture is appended in UTF-8 using this stable format:
+如果文件夹或文件不存在，应用会自动创建。文件使用 UTF-8 编码，每次采集按照以下固定格式追加：
 
 ```markdown
 ## 2026-08-16 14:30:00
 
-Copied text exactly as read from the text clipboard.
+这里是从剪贴板读取的原始文本。
 
 ---
 ```
 
-The original clipboard text is preserved. Line endings are normalized only by the operating system and filesystem APIs; no classification or content cleanup occurs. Whitespace-only clipboard content is treated as empty.
+应用保留剪贴板中的原始文本，不进行分类、改写或内容清理。只包含空格、换行等空白字符的内容视为无文本。
 
-## Components and boundaries
+## 模块划分
 
-### Capture file module
+### Markdown 写入模块
 
-A small Node.js module receives text, a timestamp, and a target path. It validates that the text is non-empty, creates the parent folder, formats one Markdown entry, and appends it. It has no Electron or UI dependency and is covered by filesystem tests using temporary directories.
+这是一个独立的 Node.js 模块，接收文本、时间和目标文件路径。它负责判断文本是否为空、创建上级文件夹、生成一条 Markdown 记录并追加写入。该模块不依赖 Electron 和界面，可以使用临时目录进行自动化测试。
 
-### Electron main process
+### Electron 主进程
 
-Creates the floating window, reads the clipboard after a capture request, invokes the capture file module, and returns a structured success or error result. It exposes only the single capture action to the renderer through a preload bridge.
+负责创建悬浮窗口，在用户发起采集后读取剪贴板，调用 Markdown 写入模块，并向界面返回结构化的成功或错误结果。它只通过预加载桥接向界面开放“采集当前剪贴板”这一项能力。
 
-### Renderer
+### 悬浮界面
 
-Renders the draggable floating control, sends the capture request on click, and changes its short status label based on the returned result. It does not access Node.js or the filesystem directly.
+负责显示可拖动的悬浮按钮，在点击时发起采集请求，并根据返回结果短暂切换状态文字。界面不能直接访问 Node.js 或本地文件系统。
 
-## Security and privacy
+## 隐私与安全
 
-- The clipboard is read only after an explicit click, not monitored in the background.
-- Data is written only to the local Markdown file.
-- The renderer runs with context isolation and without Node.js integration.
-- No network calls, telemetry, accounts, or external services are present.
+- 只有用户主动点击时才读取剪贴板，不在后台持续监听。
+- 数据只写入本地 Markdown 文件。
+- 界面启用上下文隔离，且不能直接使用 Node.js。
+- 不进行网络请求，不收集遥测数据，也不需要账号或外部服务。
 
-## Error handling
+## 异常处理
 
-- Empty or whitespace-only text produces an `empty` result and no file change.
-- Filesystem errors produce an `error` result and a lightweight failure status in the window.
-- Rapid repeated clicks are disabled while one write is in progress to avoid accidental duplicate concurrent writes.
+- 剪贴板为空或只有空白字符时返回“无文本”，不改变文件。
+- 文件系统出错时返回“保存失败”，并在悬浮窗口中显示轻量提示。
+- 一次写入尚未完成时暂时禁用重复点击，避免产生并发重复写入。
 
-Deliberate repeated clicks after a completed save create repeated entries. Automatic deduplication is outside the MVP because it can discard intentional captures.
+一次保存完成后，如果用户再次主动点击，则会生成另一条记录。本版本不自动去重，因为自动去重可能删除用户有意重复保存的内容。
 
-## Testing and acceptance
+## 测试与验收标准
 
-Automated tests are written before implementation for the capture file module:
+按照测试驱动方式，先为 Markdown 写入模块编写自动化测试，覆盖以下行为：
 
-- It formats and appends one text capture with the supplied timestamp.
-- It creates the destination directory when absent.
-- It preserves multiline and Unicode text.
-- It rejects whitespace-only text without changing the file.
-- It appends a second capture without overwriting the first.
+- 使用指定时间生成一条格式正确的文本记录并追加到文件。
+- 目标文件夹不存在时自动创建。
+- 正确保留多行文本和中文等 Unicode 字符。
+- 空白文本不会创建或改变文件。
+- 第二次采集会追加在第一次内容后面，而不是覆盖原内容。
 
-Desktop integration is verified with a development smoke mode that writes known text to Electron's clipboard, invokes the same capture path used by the UI, and confirms the Markdown output in an isolated temporary location. This validates Electron clipboard access without modifying the user's real capture file.
+桌面集成通过开发环境下的冒烟验证完成：程序先把一段已知文本写入 Electron 剪贴板，再调用与真实界面完全相同的采集流程，最后检查隔离临时目录中的 Markdown 输出。这样可以验证 Electron 读取剪贴板并写入 Markdown 的完整闭环，同时不会修改用户真实的采集文件。
 
-The MVP is accepted when automated tests pass, the Electron smoke verification confirms clipboard-to-Markdown behavior, and the floating window launches successfully on Windows.
+当全部自动化测试通过、Electron 剪贴板到 Markdown 的冒烟验证通过，并且悬浮窗口能够在 Windows 上成功启动时，视为本次最小版本达到验收标准。
 
-## Project location
+## 项目位置
 
-All project files live under:
+全部项目文件统一放在：
 
 `C:\Users\Yangy\Documents\Codex\UniversalCapture`
