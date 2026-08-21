@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Flutter / Dart 构建产物与缓存（app/.gitignore 也已包含，这里兜底）
+app/build/
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.packages
+app/pubspec.lock.bak
+app/coverage/
+app/.widget_preview/
+
+# IDE
+*.iml
+.idea/
+.vscode/
+
+# 本地采集产生的素材不应进入代码仓库（用户自己的 Obsidian 内容）
+素材/
