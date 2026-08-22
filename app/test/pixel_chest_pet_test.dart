@@ -139,4 +139,20 @@ void main() {
     expect(find.text('保存失败'), findsOneWidget);
     expect(find.textContaining('private-vault'), findsNothing);
   });
+
+  testWidgets('failed capture futures use safe text', (tester) async {
+    await pumpPet(
+      tester,
+      onCapture: () => Future<CaptureResult>.error(
+        StateError('/Users/name/private-vault: permission denied'),
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel('保存到 INbox'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 364));
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(find.text('保存失败'), findsOneWidget);
+    expect(find.textContaining('private-vault'), findsNothing);
+  });
 }
