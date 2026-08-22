@@ -1,28 +1,26 @@
 import 'dart:io';
 
-/// Obsidian Vault 内的固定相对目录。见《方案》第二、三节。
+/// Obsidian Vault 内的统一跨平台目录协议。
 class VaultPaths {
-  static const String materialsDir = '素材';
-  static const String inboxDirName = 'Inbox';
+  static const String captureDirName = 'Universal Capture';
   static const String attachmentsDirName = 'attachments';
 
-  static String inboxDir(String vaultPath) =>
-      _join(vaultPath, materialsDir, inboxDirName);
+  static String captureDir(String vaultPath) =>
+      _join(vaultPath, captureDirName);
 
   static String attachmentsDir(String vaultPath) =>
-      _join(vaultPath, materialsDir, attachmentsDirName);
+      _join(captureDir(vaultPath), attachmentsDirName);
 
-  /// `素材/Inbox/YYYY-MM-DD.md`
+  /// `Universal Capture/YYYY-MM-DD.md`
   static String dailyInboxFile(String vaultPath, DateTime date) =>
-      _join(inboxDir(vaultPath), '${_dateStamp(date)}.md');
+      _join(captureDir(vaultPath), '${_dateStamp(date)}.md');
 
   static String dateStamp(DateTime date) => _dateStamp(date);
 
   /// 附件在 Markdown 中的 Obsidian 内嵌引用路径。
   ///
-  /// Inbox 文件位于 `素材/Inbox/`，附件位于 `素材/attachments/`，
-  /// 因此相对路径为 `../attachments/<fileName>`。
-  static String embedRef(String fileName) => '../$attachmentsDirName/$fileName';
+  /// 日记文件和 attachments 目录同在 `Universal Capture/` 下。
+  static String embedRef(String fileName) => '$attachmentsDirName/$fileName';
 
   static String _dateStamp(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-'

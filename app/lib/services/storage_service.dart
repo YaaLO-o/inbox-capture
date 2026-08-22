@@ -6,14 +6,14 @@ import '../util/path_utils.dart';
 /// Obsidian Vault 写入层。
 ///
 /// 唯一存储层：所有内容都是普通 Markdown 与普通文件（见《方案》第二节）。
-/// - 每日一个 `素材/Inbox/YYYY-MM-DD.md`，只追加，绝不覆盖。
-/// - 附件写入 `素材/attachments/`。
+/// - 每日一个 `Universal Capture/YYYY-MM-DD.md`，只追加，绝不覆盖。
+/// - 附件写入 `Universal Capture/attachments/`。
 class StorageService {
-  /// 确保 Vault 的素材/Inbox、素材/attachments 目录存在。
+  /// 确保 Vault 的 Universal Capture 与 attachments 目录存在。
   void ensureVaultLayout(String vaultPath) {
-    final inbox = Directory(VaultPaths.inboxDir(vaultPath));
-    if (!inbox.existsSync()) {
-      inbox.createSync(recursive: true);
+    final capture = Directory(VaultPaths.captureDir(vaultPath));
+    if (!capture.existsSync()) {
+      capture.createSync(recursive: true);
     }
     final att = Directory(VaultPaths.attachmentsDir(vaultPath));
     if (!att.existsSync()) {
@@ -61,8 +61,7 @@ class StorageService {
     buf.writeln('---');
     buf.writeln();
 
-    file.writeAsStringSync(buf.toString(),
-        mode: FileMode.append, flush: true);
+    file.writeAsStringSync(buf.toString(), mode: FileMode.append, flush: true);
   }
 
   /// 将字节写入 attachments 目录，文件名由调用方给定。
@@ -72,8 +71,7 @@ class StorageService {
     List<int> bytes,
   ) {
     ensureVaultLayout(vaultPath);
-    final target =
-        '${VaultPaths.attachmentsDir(vaultPath)}/$fileName';
+    final target = '${VaultPaths.attachmentsDir(vaultPath)}/$fileName';
     final f = File(target);
     f.writeAsBytesSync(bytes, flush: true);
     return target;
@@ -92,8 +90,7 @@ class StorageService {
     if (!src.existsSync()) {
       throw FileSystemException('源文件不存在', sourcePath);
     }
-    final target =
-        '${VaultPaths.attachmentsDir(vaultPath)}/$fileName';
+    final target = '${VaultPaths.attachmentsDir(vaultPath)}/$fileName';
     src.copySync(target);
     return target;
   }

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:inbox_app/models/capture.dart';
 import 'package:inbox_app/services/capture_service.dart';
 import 'package:inbox_app/services/clipboard_service.dart';
 import 'package:inbox_app/services/storage_service.dart';
@@ -31,6 +32,44 @@ void main() {
 
   String readInbox(String vault, DateTime d) =>
       File(VaultPaths.dailyInboxFile(vault, d)).readAsStringSync();
+
+  test('两个桌面平台共享 Universal Capture 路径协议', () {
+    final now = DateTime(2026, 8, 21, 10, 32, 15);
+    final sep = Platform.pathSeparator;
+
+    expect(
+      VaultPaths.dailyInboxFile(tmp.path, now),
+      '${tmp.path}${sep}Universal Capture${sep}2026-08-21.md',
+    );
+    expect(
+      VaultPaths.attachmentsDir(tmp.path),
+      '${tmp.path}${sep}Universal Capture${sep}attachments',
+    );
+    expect(VaultPaths.embedRef('image.png'), 'attachments/image.png');
+  });
+
+  test('平台适配器输入相同 Capture 时生成完全相同的 Markdown', () {
+    final now = DateTime(2026, 8, 21, 10, 32, 15);
+    final macVault = Directory('${tmp.path}/macos')..createSync();
+    final windowsVault = Directory('${tmp.path}/windows')..createSync();
+    final sharedCapture = Capture(
+      id: '20260821-103215-a82f',
+      createdAt: now,
+      text: '同一条共享 Capture',
+      attachments: const [
+        Attachment(
+          id: '20260821-103215-a82f',
+          fileName: '20260821-103215-a82f.png',
+          originalExtension: 'png',
+          mimeType: 'image/png',
+        ),
+      ],
+    );
+    storage.appendCapture(macVault.path, sharedCapture);
+    storage.appendCapture(windowsVault.path, sharedCapture);
+
+    expect(readInbox(macVault.path, now), readInbox(windowsVault.path, now));
+  });
 
   test('generateCaptureId 格式正确且按时间变化', () {
     final a = generateCaptureId(DateTime(2026, 8, 21, 10, 32, 15));
@@ -66,8 +105,9 @@ void main() {
     final ids = <String>{};
     for (var i = 0; i < 10; i++) {
       final now = base.add(Duration(seconds: i + 1));
-      (svc.clipboard as FakeClipboard).content =
-          ClipboardContent(text: '笔记 #$i');
+      (svc.clipboard as FakeClipboard).content = ClipboardContent(
+        text: '笔记 #$i',
+      );
       final r = await svc.captureNow(tmp.path, now: now);
       expect(r.isSaved, isTrue, reason: '第 $i 条应保存成功');
       ids.add(r.captureId!);
@@ -90,11 +130,13 @@ void main() {
     final now = DateTime(2026, 8, 21, 14, 20, 31);
     final pngBytes = Uint8List.fromList(List.generate(64, (i) => i % 256));
     final svc = CaptureService(
-      clipboard: FakeClipboard(ClipboardContent(
-        imageBytes: pngBytes,
-        imageExtension: 'png',
-        imageMimeType: 'image/png',
-      )),
+      clipboard: FakeClipboard(
+        ClipboardContent(
+          imageBytes: pngBytes,
+          imageExtension: 'png',
+          imageMimeType: 'image/png',
+        ),
+      ),
       storage: storage,
     );
 
@@ -109,7 +151,7 @@ void main() {
 
     final md = readInbox(tmp.path, now);
     final fileName = files.single.uri.pathSegments.last;
-    expect(md, contains('![[../attachments/$fileName]]'));
+    expect(md, contains('![[attachments/$fileName]]'));
   });
 
   test('Finder 复制的本地文件：复制进 attachments 并嵌入', () async {
@@ -125,8 +167,12 @@ void main() {
     expect(r.isSaved, isTrue);
 
     final md = readInbox(tmp.path, now);
-    expect(md.contains(RegExp(r'!\[\[\.\./attachments/20260821-180412-[0-9a-f]{4}\.mp4\]\]')),
-        isTrue);
+    expect(
+      md.contains(
+        RegExp(r'!\[\[attachments/20260821-180412-[0-9a-f]{4}\.mp4\]\]'),
+      ),
+      isTrue,
+    );
     // 源文件仍在（是复制，不是移动）。
     expect(src.existsSync(), isTrue);
   });
@@ -139,23 +185,31 @@ void main() {
     );
     final r = await svc.captureNow(tmp.path, now: now);
     expect(r.status, CaptureStatus.empty);
-    expect(File(VaultPaths.dailyInboxFile(tmp.path, now)).existsSync(), isFalse);
+    expect(
+      File(VaultPaths.dailyInboxFile(tmp.path, now)).existsSync(),
+      isFalse,
+    );
   });
 
   test('文字+图片混合：两者都写入同一条 Capture', () async {
     final now = DateTime(2026, 8, 21, 16, 0, 0);
     final svc = CaptureService(
-      clipboard: FakeClipboard(ClipboardContent(
-        text: '这本书以后看看',
-        imageBytes: Uint8List.fromList([9, 8, 7]),
-        imageExtension: 'jpg',
-      )),
+      clipboard: FakeClipboard(
+        ClipboardContent(
+          text: '这本书以后看看',
+          imageBytes: Uint8List.fromList([9, 8, 7]),
+          imageExtension: 'jpg',
+        ),
+      ),
       storage: storage,
     );
     final r = await svc.captureNow(tmp.path, now: now);
     expect(r.isSaved, isTrue);
     final md = readInbox(tmp.path, now);
     expect(md, contains('这本书以后看看'));
-    expect(md.contains(RegExp(r'!\[\[\.\./attachments/[0-9\-a-f]+\.jpg\]\]')), isTrue);
+    expect(
+      md.contains(RegExp(r'!\[\[attachments/[0-9\-a-f]+\.jpg\]\]')),
+      isTrue,
+    );
   });
 }
