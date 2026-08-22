@@ -177,6 +177,33 @@ void main() {
     expect(src.existsSync(), isTrue);
   });
 
+  test('本地文件优先于同一剪贴板对象的重复图片 bytes', () async {
+    final now = DateTime(2026, 8, 21, 18, 5, 0);
+    final src = File('${tmp.path}/source.jpg')
+      ..writeAsBytesSync(Uint8List.fromList([1, 2, 3, 4]));
+    final svc = CaptureService(
+      clipboard: FakeClipboard(
+        ClipboardContent(
+          files: [src.path],
+          imageBytes: Uint8List.fromList([9, 8, 7]),
+          imageExtension: 'png',
+        ),
+      ),
+      storage: storage,
+    );
+
+    final result = await svc.captureNow(tmp.path, now: now);
+
+    expect(result.isSaved, isTrue);
+    final attachments = Directory(VaultPaths.attachmentsDir(tmp.path))
+        .listSync()
+        .whereType<File>()
+        .toList();
+    expect(attachments, hasLength(1));
+    expect(attachments.single.path, endsWith('.jpg'));
+    expect(attachments.single.readAsBytesSync(), [1, 2, 3, 4]);
+  });
+
   test('空剪贴板：不创建文件，返回 empty', () async {
     final now = DateTime(2026, 8, 21, 11, 0, 0);
     final svc = CaptureService(

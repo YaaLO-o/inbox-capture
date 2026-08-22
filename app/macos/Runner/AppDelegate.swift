@@ -46,9 +46,10 @@ enum ClipboardChannel {
       out["text"] = s
     }
 
-    // 3) 图片：先尝试按原始类型取字节，保留 PNG/JPEG/GIF 等；
-    //    只有拿不到原始格式时才回退为 PNG（见《方案》第六、七节）。
-    if let (bytes, ext, mime) = readImage(from: pb) {
+    // 3) Finder 文件优先，避免同一张图片同时保存文件和 bitmap。
+    //    普通应用复制图片时仍按原始类型读取，最后才回退为 PNG。
+    let hasFiles = (out["files"] as? [String])?.isEmpty == false
+    if !hasFiles, let (bytes, ext, mime) = readImage(from: pb) {
       out["imageBytes"] = FlutterStandardTypedData(bytes: bytes)
       out["imageExtension"] = ext
       if let mime = mime { out["imageMimeType"] = mime }

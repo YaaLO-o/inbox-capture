@@ -46,7 +46,7 @@ class ClipboardService implements ClipboardReader {
     if (result == null) return const ClipboardContent();
 
     final text = result['text'] as String?;
-    final bytes = result['imageBytes'] as Uint8List?;
+    final rawBytes = result['imageBytes'] as Uint8List?;
     final ext = (result['imageExtension'] as String?)?.toLowerCase() ?? 'png';
     final mime = result['imageMimeType'] as String?;
     final rawFiles = result['files'];
@@ -56,12 +56,13 @@ class ClipboardService implements ClipboardReader {
         if (f is String && f.isNotEmpty) files.add(f);
       }
     }
+    final hasFiles = files.isNotEmpty;
 
     return ClipboardContent(
       text: text,
-      imageBytes: bytes,
+      imageBytes: hasFiles ? null : rawBytes,
       imageExtension: ext,
-      imageMimeType: mime,
+      imageMimeType: hasFiles ? null : mime,
       files: files,
     );
   }

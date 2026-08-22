@@ -52,22 +52,20 @@ class CaptureService {
       final attachments = <Attachment>[];
 
       // 1) 图片：写入 attachments，保留原始扩展名；只有原始 bitmap 时落为 PNG。
-      if (content.imageBytes != null) {
+      if (content.files.isEmpty && content.imageBytes != null) {
         final ext = content.imageExtension.isEmpty
             ? 'png'
             : content.imageExtension;
         final fileName = '$id.$ext';
-        storage.writeAttachmentBytes(
-          vaultPath,
-          fileName,
-          content.imageBytes!,
+        storage.writeAttachmentBytes(vaultPath, fileName, content.imageBytes!);
+        attachments.add(
+          Attachment(
+            id: id,
+            fileName: fileName,
+            originalExtension: ext,
+            mimeType: content.imageMimeType,
+          ),
         );
-        attachments.add(Attachment(
-          id: id,
-          fileName: fileName,
-          originalExtension: ext,
-          mimeType: content.imageMimeType,
-        ));
       }
 
       // 2) Finder 复制的本地文件：复制进 attachments（V0.1 顺带支持）。
@@ -79,11 +77,13 @@ class CaptureService {
         final baseName = '$id$suffix${ext.isEmpty ? '' : '.$ext'}';
         try {
           storage.copyAttachmentFile(vaultPath, src, baseName);
-          attachments.add(Attachment(
-            id: '$id$suffix',
-            fileName: baseName,
-            originalExtension: ext,
-          ));
+          attachments.add(
+            Attachment(
+              id: '$id$suffix',
+              fileName: baseName,
+              originalExtension: ext,
+            ),
+          );
         } on FileSystemException catch (e) {
           // 单个文件复制失败不应让整个 Capture 崩溃；记录文字占位。
           // 这里不引入日志依赖，失败静默跳过该附件。
