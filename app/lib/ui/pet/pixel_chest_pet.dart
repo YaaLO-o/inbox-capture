@@ -187,8 +187,8 @@ class _PixelChestPetState extends State<PixelChestPet>
 
   void _updateFrame() {
     final frameOffset = (_controller.value * _sequence.frames.length).floor();
-    final frameIndex = _sequence
-        .frames[frameOffset.clamp(0, _sequence.frames.length - 1) as int];
+    final frameIndex =
+        _sequence.frames[frameOffset.clamp(0, _sequence.frames.length - 1)];
     if (_frameIndex == frameIndex || !mounted) return;
     setState(() => _frameIndex = frameIndex);
   }

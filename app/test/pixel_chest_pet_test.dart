@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inbox_app/services/capture_service.dart';
-import 'package:inbox_app/ui/pet/pet_animation_manifest.dart';
 import 'package:inbox_app/ui/pet/pixel_chest_pet.dart';
 import 'package:inbox_app/ui/pet/pixel_chest_sprite.dart';
 

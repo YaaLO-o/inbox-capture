@@ -14,8 +14,12 @@ void main() {
     expect(pixelChestSourceRect(21), const Rect.fromLTWH(160, 64, 32, 32));
   });
 
-  testWidgets('idle sprite paints at exactly 96 logical pixels', (tester) async {
-    final image = (await tester.runAsync(() => loadPixelChestAtlas(rootBundle)))!;
+  testWidgets('idle sprite paints at exactly 96 logical pixels', (
+    tester,
+  ) async {
+    final image = (await tester.runAsync(
+      () => loadPixelChestAtlas(rootBundle),
+    ))!;
     await tester.pumpWidget(
       MaterialApp(
         home: Center(
@@ -27,8 +31,10 @@ void main() {
       ),
     );
 
-    expect(tester.getSize(find.byType(PixelChestSprite)),
-        const Size.square(PixelChestAtlas.displaySize));
+    expect(
+      tester.getSize(find.byType(PixelChestSprite)),
+      const Size.square(PixelChestAtlas.displaySize),
+    );
     await expectLater(
       find.byKey(const Key('idle-boundary')),
       matchesGoldenFile('goldens/pixel_chest_idle.png'),
@@ -36,7 +42,9 @@ void main() {
   });
 
   testWidgets('capture-open sprite matches its approved frame', (tester) async {
-    final image = (await tester.runAsync(() => loadPixelChestAtlas(rootBundle)))!;
+    final image = (await tester.runAsync(
+      () => loadPixelChestAtlas(rootBundle),
+    ))!;
     await tester.pumpWidget(
       MaterialApp(
         home: Center(
