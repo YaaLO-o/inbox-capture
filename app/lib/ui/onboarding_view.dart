@@ -26,10 +26,11 @@ class _OnboardingViewState extends State<OnboardingView> {
   @override
   void initState() {
     super.initState();
-    // 放大窗口以容纳引导内容。
+    // 即时（无动画）放大窗口以容纳引导内容，避免首帧仍以胶囊尺寸绘制而溢出。
     widget.settings.setWindowSize(
       WindowSizes.onboardingWidth,
       WindowSizes.onboardingHeight,
+      animate: false,
     );
   }
 
@@ -80,78 +81,92 @@ class _OnboardingViewState extends State<OnboardingView> {
         backgroundColor: const Color(0xFF1E1E24),
         body: Padding(
           padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '选择 Obsidian Vault',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '采集内容将写入该 Vault 下的 Universal Capture 目录，附件保存在其中的 attachments 子目录。',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: Color(0xFFB7B7C2),
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 18),
-              InkWell(
-                onTap: _picking ? null : _pick,
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A2A33),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF3A3A45)),
-                  ),
-                  child: Row(
+          // SingleChildScrollView + LayoutBuilder：窗口尺寸变化/字体缩放时，
+          // 内容宁可滚动也不在底部溢出（黄黑条纹）。
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.folder_open_outlined,
-                        size: 18,
-                        color: Color(0xFFB7B7C2),
+                      const Text(
+                        '选择 Obsidian Vault',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _pickedPath ?? '点击选择文件夹…',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: _pickedPath == null
-                                ? const Color(0xFF8A8A96)
-                                : Colors.white,
+                      const SizedBox(height: 8),
+                      const Text(
+                        '采集内容将写入该 Vault 下的 Universal Capture 目录，附件保存在其中的 attachments 子目录。',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFFB7B7C2),
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      InkWell(
+                        onTap: _picking ? null : _pick,
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
                           ),
-                          overflow: TextOverflow.ellipsis,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2A2A33),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFF3A3A45)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.folder_open_outlined,
+                                size: 18,
+                                color: Color(0xFFB7B7C2),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _pickedPath ?? '点击选择文件夹…',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    color: _pickedPath == null
+                                        ? const Color(0xFF8A8A96)
+                                        : Colors.white,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          _error!,
+                          style: const TextStyle(
+                              fontSize: 12, color: Colors.redAccent),
+                        ),
+                      ],
+                      // 正常高度下把按钮顶到底部；内容超高时由 ScrollView 接管，不再溢出。
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 40,
+                        child: FilledButton(
+                          onPressed:
+                              _pickedPath == null || _picking ? null : _confirm,
+                          child: Text(_picking ? '选择中…' : '开始使用'),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  _error!,
-                  style: const TextStyle(fontSize: 12, color: Colors.redAccent),
-                ),
-              ],
-              const Spacer(),
-              SizedBox(
-                width: double.infinity,
-                height: 40,
-                child: FilledButton(
-                  onPressed: _pickedPath == null || _picking ? null : _confirm,
-                  child: Text(_picking ? '选择中…' : '开始使用'),
-                ),
-              ),
-            ],
+              );
+            },
           ),
         ),
       ),

@@ -33,8 +33,13 @@ class SettingsService {
   Future<String?> pickFolder() => _channel.invokeMethod<String>('pickFolder');
 
   /// 调整悬浮窗口尺寸（未配置 Vault 时放大显示引导）。
-  Future<void> setWindowSize(double width, double height) => _channel
-      .invokeMethod('setWindowSize', {'width': width, 'height': height});
+  /// [animate] 为 false 时即时切换（无动画），用于首帧/视图切换避免尺寸错配。
+  Future<void> setWindowSize(double width, double height, {bool animate = true}) =>
+      _channel.invokeMethod('setWindowSize', {
+        'width': width,
+        'height': height,
+        'animate': animate,
+      });
 
   /// 按 Flutter 逻辑像素移动原生桌面窗口。
   Future<void> moveWindowBy(double dx, double dy) =>

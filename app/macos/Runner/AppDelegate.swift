@@ -115,7 +115,9 @@ enum SettingsChannel {
               let h = args["height"] as? Double else {
           result(FlutterError(code: "BAD_ARGS", message: "setWindowSize 需要 width/height", details: nil)); return
         }
-        setWindowSize(controller: controller, width: w, height: h)
+        // 默认动画；启动/切换关键视图时传 animate:false 可即时调整，避免首帧错配。
+        let animate = (args["animate"] as? Bool) ?? true
+        setWindowSize(controller: controller, width: w, height: h, animate: animate)
         result(nil)
       case "moveWindowBy":
         guard let args = call.arguments as? [String: Any],
@@ -134,14 +136,32 @@ enum SettingsChannel {
     }
   }
 
-  private static func setWindowSize(controller: FlutterViewController, width: Double, height: Double) {
+  private static func setWindowSize(controller: FlutterViewController, width: Double, height: Double, animate: Bool) {
     guard let window = controller.view.window else { return }
     let newSize = NSSize(width: width, height: height)
-    var frame = window.frame
-    // 保持窗口左上角位置不变，只调整宽高（macOS 坐标原点在左下角）。
-    frame.origin.y += frame.size.height - CGFloat(height)
-    frame.size = newSize
-    window.animator().setFrame(frame, display: true)
+    // setContentSize 直接设置内容区尺寸，Flutter 视图与之一致，不会被标题栏吃掉高度。
+    // 同时保持窗口顶边（左上角）位置不变。
+    let oldTop = window.frame.maxY
+    let oldLeft = window.frame.minX
+    let apply = {
+      window.setContentSize(newSize)
+      var f = window.frame
+      f.origin.x = oldLeft
+      f.origin.y = oldTop - f.height
+      window.setFrameOrigin(f.origin)
+    }
+    if animate {
+      NSAnimationContext.runAnimationGroup({ ctx in
+        ctx.duration = 0.2
+        window.animator().setContentSize(newSize)
+        var f = window.frame
+        f.origin.x = oldLeft
+        f.origin.y = oldTop - f.height
+        window.animator().setFrameOrigin(f.origin)
+      }, completionHandler: nil)
+    } else {
+      apply()
+    }
   }
 
   private static func moveWindowBy(controller: FlutterViewController, dx: Double, dy: Double) {
