@@ -1,7 +1,7 @@
 /// 统一的 Capture 原始数据模型。
 ///
 /// 这里只描述"原始采集到的内容"，不包含任何分类/摘要等 AI 推理结果。
-/// 见《Mac V0.1 开发执行方案》第九节。
+/// macOS 和 Windows 共用该原始数据协议。
 class Capture {
   final String id;
   final DateTime createdAt;

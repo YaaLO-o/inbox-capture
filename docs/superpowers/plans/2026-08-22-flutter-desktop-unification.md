@@ -33,11 +33,11 @@
 - Produces: a repository root with no production `npm start` entry point
 - Preserves: all Electron source and tests as reference code
 
-- [ ] **Step 1: Record the current tracked Electron file set**
+- [x] **Step 1: Record the current tracked Electron file set**
 
 Run: `git ls-files package.json package-lock.json src tests docs/superpowers/specs/2026-08-16-universal-capture-mvp-design.md docs/superpowers/plans/2026-08-16-universal-capture-mvp.md`
 
-- [ ] **Step 2: Move the files with Git history intact**
+- [x] **Step 2: Move the files with Git history intact**
 
 ```bash
 mkdir -p legacy/electron-windows/docs/superpowers/specs legacy/electron-windows/docs/superpowers/plans
@@ -46,11 +46,11 @@ git mv docs/superpowers/specs/2026-08-16-universal-capture-mvp-design.md legacy/
 git mv docs/superpowers/plans/2026-08-16-universal-capture-mvp.md legacy/electron-windows/docs/superpowers/plans/
 ```
 
-- [ ] **Step 3: Add a legacy README and verify the root no longer exposes npm start**
+- [x] **Step 3: Add a legacy README and verify the root no longer exposes npm start**
 
 Run: `test ! -f package.json && test -f legacy/electron-windows/package.json`
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add .gitignore legacy docs
@@ -68,7 +68,7 @@ git commit -m "chore: move Electron client to legacy"
 - Produces: `VaultPaths.captureDir`, `dailyInboxFile`, `attachmentsDir`, and `embedRef`
 - Preserves: `CaptureService.captureNow(String vaultPath, {DateTime? now})`
 
-- [ ] **Step 1: Write failing path and Markdown tests**
+- [x] **Step 1: Write failing path and Markdown tests**
 
 ```dart
 expect(VaultPaths.dailyInboxFile(vault, now), endsWith('Universal Capture${Platform.pathSeparator}2026-08-21.md'));
@@ -76,11 +76,11 @@ expect(VaultPaths.attachmentsDir(vault), endsWith('Universal Capture${Platform.p
 expect(markdown, contains('![[attachments/$fileName]]'));
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails on the old `素材/Inbox` paths**
+- [x] **Step 2: Run the focused test and verify it fails on the old `素材/Inbox` paths**
 
 Run: `flutter test test/capture_service_test.dart`
 
-- [ ] **Step 3: Implement the minimum shared path change**
+- [x] **Step 3: Implement the minimum shared path change**
 
 ```dart
 static const captureDirName = 'Universal Capture';
@@ -90,11 +90,11 @@ static String dailyInboxFile(String vaultPath, DateTime date) =>
 static String embedRef(String fileName) => '$attachmentsDirName/$fileName';
 ```
 
-- [ ] **Step 4: Run all Flutter tests**
+- [x] **Step 4: Run all Flutter tests**
 
 Run: `flutter test`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/lib/util/path_utils.dart app/lib/services/storage_service.dart app/test/capture_service_test.dart
@@ -113,7 +113,7 @@ git commit -m "feat: unify desktop capture storage protocol"
 - Produces: `SettingsService.loadValidVaultPath()` and `clearVaultPath()`
 - Native contract: `clearVaultPath` removes the stored platform value
 
-- [ ] **Step 1: Write a failing MethodChannel test**
+- [x] **Step 1: Write a failing MethodChannel test**
 
 ```dart
 final path = await SettingsService().loadValidVaultPath();
@@ -122,11 +122,11 @@ expect(methods, contains('clearVaultPath'));
 expect(Directory(stalePath).existsSync(), isFalse);
 ```
 
-- [ ] **Step 2: Run the focused test and verify the method is missing**
+- [x] **Step 2: Run the focused test and verify the method is missing**
 
 Run: `flutter test test/settings_service_test.dart`
 
-- [ ] **Step 3: Implement validation without creating directories**
+- [x] **Step 3: Implement validation without creating directories**
 
 ```dart
 Future<String?> loadValidVaultPath() async {
@@ -138,13 +138,13 @@ Future<String?> loadValidVaultPath() async {
 }
 ```
 
-- [ ] **Step 4: Add `clearVaultPath` to macOS and use validated loading at boot**
+- [x] **Step 4: Add `clearVaultPath` to macOS and use validated loading at boot**
 
-- [ ] **Step 5: Run the focused and full tests**
+- [x] **Step 5: Run the focused and full tests**
 
 Run: `flutter test test/settings_service_test.dart && flutter test`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/lib app/test/settings_service_test.dart app/macos/Runner/AppDelegate.swift
@@ -163,18 +163,18 @@ git commit -m "fix: reject stale Vault settings"
 **Interfaces:**
 - Rule: non-empty `files` suppresses `imageBytes`, while accompanying text remains
 
-- [ ] **Step 1: Write a failing capture test with one source file and image bytes**
+- [x] **Step 1: Write a failing capture test with one source file and image bytes**
 
 ```dart
 final content = ClipboardContent(files: [source.path], imageBytes: Uint8List.fromList([9]));
 expect(Directory(VaultPaths.attachmentsDir(vault)).listSync().whereType<File>(), hasLength(1));
 ```
 
-- [ ] **Step 2: Verify the old code creates two attachments**
+- [x] **Step 2: Verify the old code creates two attachments**
 
 Run: `flutter test test/capture_service_test.dart --plain-name '本地文件优先于重复图片 bytes'`
 
-- [ ] **Step 3: Implement shared precedence and MethodChannel normalization**
+- [x] **Step 3: Implement shared precedence and MethodChannel normalization**
 
 ```dart
 final hasFiles = content.files.isNotEmpty;
@@ -183,13 +183,13 @@ if (!hasFiles && content.imageBytes != null) {
 }
 ```
 
-- [ ] **Step 4: Make macOS skip `readImage` when file URLs exist**
+- [x] **Step 4: Make macOS skip `readImage` when file URLs exist**
 
-- [ ] **Step 5: Run all tests and build macOS**
+- [x] **Step 5: Run all tests and build macOS**
 
 Run: `flutter test && flutter build macos --debug`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/lib app/test app/macos/Runner/AppDelegate.swift
@@ -210,26 +210,26 @@ git commit -m "fix: avoid duplicate file image captures"
 - Clipboard channel: `com.inbox.app/clipboard`, `readClipboard`
 - Settings channel: `com.inbox.app/settings`, all methods listed in the spec
 
-- [ ] **Step 1: Generate only the Windows runner**
+- [x] **Step 1: Generate only the Windows runner**
 
 Run: `flutter create --platforms=windows .`
 
-- [ ] **Step 2: Register C++ MethodChannels in `FlutterWindow::OnCreate`**
+- [x] **Step 2: Register C++ MethodChannels in `FlutterWindow::OnCreate`**
 
 ```cpp
 platform_channels_ = std::make_unique<PlatformChannels>(
     flutter_controller_->engine()->messenger(), GetHandle());
 ```
 
-- [ ] **Step 3: Implement clipboard text, `CF_HDROP`, original PNG/JPEG, and bitmap-to-PNG fallback**
+- [x] **Step 3: Implement clipboard text, `CF_HDROP`, original PNG/JPEG, and bitmap-to-PNG fallback**
 
-- [ ] **Step 4: Implement Registry settings, IFileDialog, window sizing/moving, and quit**
+- [x] **Step 4: Implement Registry settings, IFileDialog, window sizing/moving, and quit**
 
-- [ ] **Step 5: Configure a borderless topmost tool window**
+- [x] **Step 5: Configure a borderless topmost tool window**
 
-- [ ] **Step 6: Add the adapter sources and Windows libraries to CMake**
+- [x] **Step 6: Add the adapter sources and Windows libraries to CMake**
 
-- [ ] **Step 7: Verify generated files are scoped to Windows and commit**
+- [x] **Step 7: Verify generated files are scoped to Windows and commit**
 
 ```bash
 git diff --check
@@ -251,7 +251,7 @@ git commit -m "feat: add Flutter Windows desktop adapter"
 - Produces: round `收` button, drag handle, status label, shared context menu
 - Native method: `moveWindowBy(dx, dy)`
 
-- [ ] **Step 1: Write a failing widget test for the visible `收` entry and initial status**
+- [x] **Step 1: Write a failing widget test for the visible `收` entry and initial status**
 
 ```dart
 expect(find.text('收'), findsOneWidget);
@@ -259,19 +259,19 @@ expect(find.text('点击保存'), findsOneWidget);
 expect(find.text('•••'), findsOneWidget);
 ```
 
-- [ ] **Step 2: Run the widget test and verify the current pill fails**
+- [x] **Step 2: Run the widget test and verify the current pill fails**
 
 Run: `flutter test test/capture_pill_test.dart`
 
-- [ ] **Step 3: Implement the minimum shared widget and drag callback**
+- [x] **Step 3: Implement the minimum shared widget and drag callback**
 
-- [ ] **Step 4: Implement `moveWindowBy` in macOS and Windows settings adapters**
+- [x] **Step 4: Implement `moveWindowBy` in macOS and Windows settings adapters**
 
-- [ ] **Step 5: Run widget and full tests**
+- [x] **Step 5: Run widget and full tests**
 
 Run: `flutter test test/capture_pill_test.dart && flutter test`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/lib app/test/capture_pill_test.dart app/macos app/windows
@@ -290,7 +290,7 @@ git commit -m "feat: share floating capture experience"
 - CI runs from `app/` on `windows-latest`
 - Documentation distinguishes locally verified results from pending Windows runner results
 
-- [ ] **Step 1: Add the minimal Windows workflow**
+- [x] **Step 1: Add the minimal Windows workflow**
 
 ```yaml
 - uses: subosito/flutter-action@v2
@@ -305,19 +305,19 @@ git commit -m "feat: share floating capture experience"
   working-directory: app
 ```
 
-- [ ] **Step 2: Rewrite all three README/state documents to match the actual repository**
+- [x] **Step 2: Rewrite all three README/state documents to match the actual repository**
 
-- [ ] **Step 3: Run fresh local verification**
+- [x] **Step 3: Run fresh local verification**
 
 Run: `flutter pub get && dart analyze lib test && flutter test && flutter build macos --debug`
 
-- [ ] **Step 4: Launch the macOS debug executable briefly and verify it stays alive**
+- [x] **Step 4: Launch the macOS debug executable briefly and verify it stays alive**
 
-- [ ] **Step 5: Verify repository state and inspect the complete diff**
+- [x] **Step 5: Verify repository state and inspect the complete diff**
 
 Run: `git diff --check && git status --short --branch && git log --oneline -8`
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add .github README.md PROJECT_STATE.md app/README.md docs/superpowers/plans/2026-08-22-flutter-desktop-unification.md

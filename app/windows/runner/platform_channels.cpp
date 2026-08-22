@@ -123,8 +123,8 @@ std::optional<CLSID> FindImageEncoder(const wchar_t* mime_type) {
   if (Gdiplus::GetImageEncodersSize(&count, &size) != Gdiplus::Ok || size == 0) {
     return std::nullopt;
   }
-  std::vector<uint8_t> buffer(size);
-  auto* codecs = reinterpret_cast<Gdiplus::ImageCodecInfo*>(buffer.data());
+  auto buffer = std::make_unique<uint8_t[]>(size);
+  auto* codecs = reinterpret_cast<Gdiplus::ImageCodecInfo*>(buffer.get());
   if (Gdiplus::GetImageEncoders(count, size, codecs) != Gdiplus::Ok) {
     return std::nullopt;
   }

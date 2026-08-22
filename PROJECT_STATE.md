@@ -1,149 +1,186 @@
 # Project State
 
-## 产品定位
-
-个人兴趣与知识采集 Inbox。当在小红书、微博、抖音、网页、购物平台等处看到以后想看的书、电影、商品、店铺、文章、观点或图片时，用一个极低摩擦的动作（复制 → 点击 Mac 桌面悬浮入口）直接保存到自己的 Obsidian Vault，而不再依赖各平台自己的收藏夹。
-
-## 长期目标
-
-产品逻辑：Capture → Understand → Organize。
-
-- 当前只做 **Capture**，不做任何 AI 分类/摘要/整理。
-- 目标平台：macOS（当前）、Windows、Android、iOS（未来）。用 Flutter 保持跨平台可能，macOS 特殊系统能力用原生 Swift + Platform Channel 补足。
+更新时间：2026-08-22
 
 ## 当前阶段
 
-Mac V0.1 Capture MVP。
+Flutter Desktop Capture 基础设施统一完成。`app/` 是唯一正式主工程，包含 macOS 和 Windows target；旧 Electron Windows 客户端已降级到 `legacy/electron-windows/`，只作为迁移参考。
 
-## 当前架构
+Windows 原生代码已经实现，但当前开发机是 macOS，无法在本机编译 Windows Runner。仓库已增加 Windows GitHub Actions build check；在该工作流或 Windows 真机成功前，Windows 状态是“代码完成、待 Windows 编译与交互验证”。
 
-技术栈：Flutter 3.47.1 / Dart 3.13.1，macOS 原生 Swift。工程位于 `app/`。
+## 产品范围
 
-- Flutter macOS 模板通过 **Swift Package Manager (SPM)** 集成 FlutterMacOS 引擎，不是 CocoaPods。
-- V0.1 只使用原生 MethodChannel，**未引入任何需要 CocoaPods 的三方 Flutter 插件**，因此本版本构建/运行不依赖 CocoaPods。
-- 分层：
-  - `lib/main.dart`：应用启动、加载 Vault 设置、在引导页与悬浮胶囊间切换、调整窗口尺寸。
-  - `lib/services/clipboard_service.dart`：剪贴板抽象 `ClipboardReader` + 原生通道实现，返回文字/图片字节/本地文件路径。
-  - `lib/services/storage_service.dart`：唯一存储层。建目录、每日 Inbox 追加（同步写、只追加不覆盖）、附件写入/复制。
-  - `lib/services/capture_service.dart`：Capture 编排。读剪贴板 → 生成 Capture ID → 落盘附件 → 追加 Markdown；含 500ms 防抖；异常不外抛。
-  - `lib/services/settings_service.dart`：Vault 路径持久化（UserDefaults）、原生选目录、窗口尺寸、退出。
-  - `lib/models/capture.dart`：Capture / Attachment 轻量数据模型。
-  - `lib/util/id_gen.dart`：Capture ID `YYYYMMDD-HHMMSS-XXXX`。
-  - `lib/util/path_utils.dart`：Vault 内固定目录与 Obsidian 引用路径。
-  - `lib/ui/onboarding_view.dart`：首次启动选择 Vault。
-  - `lib/ui/capture_pill.dart`：悬浮胶囊按钮，点击采集，轻量反馈后自动消失；右键菜单可重选 Vault / 退出。
-  - `macos/Runner/AppDelegate.swift`：两个 MethodChannel——剪贴板（文字、原始格式图片 PNG/JPEG/GIF/TIFF/WebP、Finder 文件 URL）、设置（UserDefaults、NSOpenPanel 选目录、窗口尺寸、退出）。
-  - `macos/Runner/MainFlutterWindow.swift`：配置小型、可拖拽、置顶、跨空间的悬浮窗口；`NSApp.setActivationPolicy(.accessory)` 隐藏 Dock 图标。
+当前只做 Capture：用户复制文字、图片或本地文件后点击悬浮入口，原始内容直接追加到 Obsidian Vault。
 
-数据流：复制内容 → 点击胶囊 → `ClipboardService` 经 MethodChannel 读 NSPasteboard → `CaptureService` 生成 Capture 并调用 `StorageService` → 附件落 `素材/attachments/`、Markdown 追加到 `素材/Inbox/YYYY-MM-DD.md` → UI 显示「✓ 已保存」并自动消失。
+不包含 AI 分类、摘要、标签、Understand、Organize、搜索、云同步、账号、后端、数据库、网络内容解析、下载、Android、iOS 或 Web。
 
-## Obsidian 数据结构
+## 最终架构
 
-所有内容都是普通 Markdown 与普通文件，直接存于用户选择的 Obsidian Vault。无数据库、无 Base64、无媒体数据库。
-
+```text
+Shared Flutter app
+├── Dart model / CaptureService / StorageService / VaultPaths
+├── shared onboarding and floating capture UI
+├── macOS Swift + AppKit MethodChannel adapter
+└── Windows C++ + Win32 MethodChannel adapter
 ```
+
+共享 Dart 决定：
+
+- Capture ID
+- 文字 trim 与空内容处理
+- 文件优先于重复 bitmap
+- 附件文件名
+- Vault 目录
+- Markdown 格式
+- 每日文件和 append 行为
+- 已保存 Vault 路径有效性
+
+平台 adapter 只提供：
+
+- 剪贴板文字、图片字节、原始格式和本地文件路径
+- 原生文件夹选择
+- Vault 路径持久化与清理
+- 窗口尺寸和位置
+- 应用退出
+
+## MethodChannel contract
+
+两个平台使用相同 channel：
+
+```text
+com.inbox.app/clipboard
+  readClipboard -> text, imageBytes, imageExtension, imageMimeType, files
+
+com.inbox.app/settings
+  getVaultPath
+  setVaultPath(path)
+  clearVaultPath
+  pickFolder
+  setWindowSize(width, height)
+  moveWindowBy(dx, dy)
+  quit
+```
+
+macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows 使用 Win32 Clipboard、CF_HDROP、Registry、IFileDialog 和原生窗口 API。
+
+## 统一 Vault 协议
+
+两个平台的新 Capture 统一写入：
+
+```text
 <Vault>/
-└── 素材/
-    ├── Inbox/
-    │   ├── 2026-08-21.md
-    │   └── ...
+└── Universal Capture/
+    ├── YYYY-MM-DD.md
     └── attachments/
-        ├── 20260821-103215-a82f.png
-        └── ...
+        └── <capture-id>.<extension>
 ```
 
-每条 Capture 格式：
+日记文件首行是日期标题。每条 Capture 包含时间、唯一 ID 注释、可选文字、附件 Obsidian embed 和分隔线。所有写入使用 append，不覆盖已有内容。
 
-```markdown
-## 10:32:15
-
-<!-- capture:id=20260821-103215-a82f -->
-
-内容文字 / 或 ![[../attachments/xxxx.png]]
-
----
-```
-
-- 每天一个 Inbox 文件，首行 `# YYYY-MM-DD`，只追加，绝不覆盖。
-- 附件保留原始格式（PNG/JPEG/GIF/PDF/MP4/MOV…）；只有剪贴板仅提供原始 bitmap 时才回退落为 PNG。
-- 图片/PDF/视频在 Markdown 中统一用 Obsidian embed `![[../attachments/<文件名>]]`，由扩展名决定渲染。
+历史 `素材/Inbox`、`素材/attachments` 和旧 Electron 内容不会被自动迁移或删除。
 
 ## 已实现
 
-- 文字 Capture：读剪贴板、trim、空内容不保存、写入当天 Inbox、含创建时间与唯一 ID。
-- 连续追加保存：多次点击全部追加、不覆盖、顺序正确、每条独立 ID。
-- 图片 Capture：读取剪贴板图片（尽量保留原始格式），写入 `素材/attachments/`，Inbox 写入内嵌引用。
-- Finder 复制的本地文件：复制进 `素材/attachments/`（顺带支持，不阻塞 V0.1），Markdown 写入内嵌引用；源文件保留。
-- 首次启动弹出原生目录选择器选择 Obsidian Vault；路径写入 UserDefaults，重启后自动读取、不再询问。
-- 自动创建 `素材/`、`素材/Inbox/`、`素材/attachments/`。
-- 悬浮入口：小窗口、可拖拽、置顶、跨桌面空间、不长期遮挡；点击即采集；成功显示「✓ 已保存」约 1.4 秒后自动消失；失败显示「保存失败」；空剪贴板显示提示；不崩溃。
-- 重复快速点击防抖（500ms 内忽略）。
-- 右键菜单：重新选择 Vault、退出。
-- 单元测试 7 项全绿（ID 格式、文字、连续 10 条、图片、本地文件、空剪贴板、文字+图片混合）。
-- `dart analyze lib test`：No issues found。
-- `flutter build macos --debug`：构建成功，产出 `app/build/macos/Build/Products/Debug/inbox_app.app`，并已实际启动验证进程稳定运行不崩溃。
+### 共享 Dart 与 UI
 
-## 当前问题
+- 文字、图片、本地文件 Capture
+- 唯一 Capture ID 和每日 Markdown
+- 附件普通文件存储与 Obsidian embed
+- 连续 append、不覆盖
+- 500ms 快速点击防重
+- 失效 Vault 路径清理，验证过程不创建旧目录
+- 本地文件优先于同一剪贴板对象的 bitmap
+- 共享 `•••` 拖动把手、圆形“收”入口和状态反馈
+- 右键重新选择 Vault、退出
 
-- App Sandbox 在 V0.1 被关闭（`com.apple.security.app-sandbox = false`）。原因：sandbox 下写入用户任意选择的 Vault 目录并在重启后继续写入，需要持久化 security-scoped bookmark，超出本版范围。未来若要上架/沙箱分发需补上。
-- 因 LSUIElement/accessory 模式，应用不在 Dock 显示图标、无标准主菜单；退出通过胶囊右键菜单。
-- 自动化的真实点击/截图在当前终端缺少「辅助功能/屏幕录制」权限，未能用脚本完成端到端点击；已用单元测试覆盖数据路径，原生代码已通过真实编译。**剩余的人工验证：在 Obsidian 中确认图片 embed 能正常显示（测试 3）。**
-- 网络视频/小红书/抖音等「复制」得到的是 URL 或分享文本，按普通文字保存；不做任何网络下载或解析。
-- `flutter analyze`（analysis server）在本机偶发进程崩溃（exit 255，分析器自身问题）；改用 `dart analyze` 结果为干净。
+### macOS adapter
 
-## 已确认决策
+- 文字、PNG、JPEG、GIF、TIFF、WebP 和 bitmap PNG 回退
+- Finder 文件 URL
+- Finder 文件存在时不再读取重复图片 bytes
+- UserDefaults、NSOpenPanel、窗口缩放/移动、置顶和跨空间
+- LSUIElement/accessory 模式隐藏 Dock 图标
 
-- Capture 阶段不分类、不摘要、不打标签（书/电影/商品/店铺/文章等属于未来 AI Understand）。
-- Raw Inbox 是 source of truth；未来 AI 整理结果是 derived data，默认不删除原始 Inbox。
-- Obsidian 是唯一存储层；不建数据库、不建应用自己的媒体库。
-- 媒体采用 Obsidian attachment 模型：附件作为普通文件存放，Markdown 只保存引用。
-- 网络视频暂不自动下载；URL/分享文本按文字 Capture 保存。
-- 工程放在 `app/` 子目录，避免污染 Vault 根目录。
-- V0.1 关闭 App Sandbox 以换取对任意 Vault 目录的直接读写与重启后可写。
-- 本版本不依赖 CocoaPods（SPM 集成引擎 + 原生 MethodChannel，零三方插件）。
+### Windows adapter
 
-## 如何运行 / 测试
+- CF_UNICODETEXT 文字
+- CF_HDROP Explorer 文件
+- 注册剪贴板 PNG/JPEG 原始字节优先
+- CF_BITMAP、CF_DIB、CF_DIBV5 通过 GDI+ 回退 PNG
+- 文件存在时不再读取 bitmap
+- HKCU Registry Vault 持久化
+- IFileDialog 原生目录选择
+- 无边框、置顶、Tool Window 窗口
+- 窗口缩放、拖动和退出
 
-前置：Flutter 3.47.1、Xcode（命令行可 `flutter doctor` 确认）。无需 CocoaPods。
+## 自动化测试
+
+当前 Flutter 测试共 17 项，覆盖：
+
+- 统一目录和 attachment 引用
+- macOS/Windows 标记输入生成相同 Markdown
+- Capture ID
+- 文字 trim、新文件格式
+- 连续 10 条 append
+- 图片和本地文件
+- 带点父目录中的无扩展名文件
+- 文件优先于重复 bitmap
+- 空剪贴板
+- 文字与图片混合
+- 有效和失效 Vault 配置
+- ClipboardService contract 归一化
+- 共享悬浮入口可见元素和拖动通道
+- 首次引导中的统一目录说明
+
+旧 Electron 11 项 Node 测试仍保留在 legacy 目录并通过，但不再作为正式客户端验收项。
+
+## 本轮本机验证
+
+在 macOS 开发机完成：
+
+```text
+flutter pub get                 通过
+dart analyze lib test           No issues found
+flutter test                    17/17 通过
+flutter build macos --debug     通过
+macOS debug executable launch   通过，进程稳定存活 3 秒
+```
+
+## Windows CI
+
+`.github/workflows/windows-build.yml` 使用 `windows-latest` 和 Flutter 3.47.1，执行：
+
+```text
+flutter pub get
+dart analyze lib test
+flutter test
+flutter build windows
+```
+
+工作流文件已加入仓库，但本轮没有 push，因此尚无远端 Windows runner 结果。不能据此声称 Windows 已编译通过。
+
+## 已知问题与人工验证
+
+- 必须在 Windows runner 或 Windows 真机首次编译 C++ Runner。
+- 必须真机测试 Windows 文字、PNG/JPEG、bitmap、Explorer 文件、目录选择、重启恢复、拖动、右键菜单与退出。
+- 需要在真实 Obsidian 中验证图片、PDF 和视频 embed 显示。
+- macOS App Sandbox 仍关闭；重新启用需要 security-scoped bookmark。
+- 安装包、代码签名、公证、开机启动和发布流程不在当前范围。
+
+## 运行方式
+
+macOS：
 
 ```bash
 cd app
 flutter pub get
-flutter analyze            # 或 dart analyze lib test
-flutter test               # 7 项单元测试
-flutter run -d macos       # 启动悬浮应用
-# 发布/调试构建：
-flutter build macos --debug
+flutter run -d macos
 ```
 
-首次启动会弹出目录选择器，选择你的 Obsidian Vault 根目录即可；之后重启自动记住。
+Windows：
 
-## 下一步
-
-- 人工在真实 Obsidian Vault 中验证：文字、连续保存、图片内嵌显示、重启记忆、空剪贴板/无权限/快速点击等异常场景。
-- 评估是否需要安全-scoped bookmark 以重新启用 App Sandbox（为未来分发准备）。
-- 打磨悬浮窗口的视觉细节与拖拽/定位记忆（当前不阻塞 V0.1 验收）。
-- Capture 阶段之后再规划 Understand / Organize（AI 整理），当前不实现。
-
-## 最近更新
-
-日期：2026-08-21
-
-本轮完成：
-- 搭建 Flutter macOS 工程（`app/`），确认引擎经 SPM 集成、无需 CocoaPods。
-- 实现 Dart 存储层、Capture 编排、ID 生成、设置持久化、剪贴板抽象。
-- 实现 macOS 原生 MethodChannel（剪贴板文字/原始图片/文件、NSOpenPanel 选目录、UserDefaults、窗口控制、退出）。
-- 实现悬浮窗口（置顶/可拖拽/跨空间/Dock 隐藏）与引导页、胶囊按钮及反馈。
-- 配置 Info.plist（LSUIElement）与 entitlements（V0.1 关闭沙箱）。
-- 编写并通过 7 项单元测试；`dart analyze` 无问题；`flutter build macos --debug` 成功并实际启动。
-
-验证：
-- 单元测试：7/7 通过。
-- 静态分析：No issues found。
-- 构建：成功产出 .app 并启动运行不崩溃。
-- 待人工补充：Obsidian 内图片显示与异常场景的真机点击。
-
-遗留：
-- 沙箱关闭的安全权衡（见「当前问题」）。
-- 真机端到端点击/截图受限于系统辅助功能与屏幕录制权限。
-- 系统 Ruby 仍为 2.6.10（按要求未改动）；Homebrew 已解压到 `~/homebrew` 但未继续装 Ruby/CocoaPods——V0.1 不需要。
+```powershell
+cd app
+flutter pub get
+flutter run -d windows
+```

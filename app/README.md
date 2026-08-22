@@ -1,17 +1,21 @@
-# inbox_app
+# INbox Flutter Desktop Client
 
-Personal interest capture Inbox (macOS)
+This is the only production client for INbox. It shares one Dart Capture and storage layer across macOS and Windows, with small native adapters under `macos/` and `windows/`.
 
-## Getting Started
+Run from this directory:
 
-This project is a starting point for a Flutter application.
+```bash
+flutter pub get
+flutter test
+flutter run -d macos
+```
 
-A few resources to get you started if this is your first Flutter project:
+On Windows:
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```powershell
+flutter pub get
+flutter test
+flutter run -d windows
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+See the repository [README](../README.md) for architecture, Vault layout, prerequisites, and current platform verification status.

@@ -204,6 +204,30 @@ void main() {
     expect(attachments.single.readAsBytesSync(), [1, 2, 3, 4]);
   });
 
+  test('带点父目录中的无扩展名文件仍能作为附件保存', () async {
+    final now = DateTime(2026, 8, 21, 18, 6, 0);
+    final dottedDir = Directory('${tmp.path}/folder.with.dot')..createSync();
+    final src = File('${dottedDir.path}/LICENSE')..writeAsStringSync('content');
+    final svc = CaptureService(
+      clipboard: FakeClipboard(ClipboardContent(files: [src.path])),
+      storage: storage,
+    );
+
+    final result = await svc.captureNow(tmp.path, now: now);
+
+    expect(result.isSaved, isTrue);
+    final attachments = Directory(VaultPaths.attachmentsDir(tmp.path))
+        .listSync()
+        .whereType<File>()
+        .toList();
+    expect(attachments, hasLength(1));
+    expect(
+      attachments.single.uri.pathSegments.last,
+      matches(RegExp(r'^20260821-180600-[0-9a-f]{4}$')),
+    );
+    expect(attachments.single.readAsStringSync(), 'content');
+  });
+
   test('空剪贴板：不创建文件，返回 empty', () async {
     final now = DateTime(2026, 8, 21, 11, 0, 0);
     final svc = CaptureService(

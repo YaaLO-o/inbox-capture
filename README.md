@@ -1,89 +1,120 @@
-# Universal Capture
+# INbox / Universal Capture
 
-Universal Capture 是一个本地优先的桌面文本采集工具。它把“随手复制的内容”快速追加到 Obsidian 仓库中的 Markdown 文件。
+INbox 是一个本地优先的桌面采集工具。复制文字、图片或本地文件后，点击桌面悬浮入口，内容会作为普通 Markdown 和附件追加到用户选择的 Obsidian Vault。
 
-当前版本只完成最小闭环：
+`app/` 下的 Flutter 工程是唯一正式客户端，同一套 Dart 产品与数据层面向 macOS 和 Windows。项目不使用数据库，不上传内容，也不在后台监听剪贴板。
 
-1. 在任意应用中复制文本。
-2. 点击桌面上的“收”悬浮按钮。
-3. 应用读取当前文本剪贴板。
-4. 内容追加到 Obsidian，并短暂显示“已保存”。
+## 当前平台状态
 
-## 运行环境
+- macOS：Flutter + Swift/AppKit，已在本机完成分析、测试、构建和进程启动验证。
+- Windows：同一 Flutter 工程 + C++/Win32 Runner，已实现原生适配器；仓库包含 Windows GitHub Actions 构建检查，仍需 Windows runner 或真机完成首次编译与交互验证。
+- Android、iOS、Web：不在当前范围。
 
-- Windows 10 或 Windows 11（64 位）
-- Node.js 22.12.0 或更高版本
-- 已安装并至少打开过一次 Obsidian
+## 功能
 
-本项目当前锁定 Electron 43.4.0。
+- 文字、图片和 Finder/Explorer 本地文件 Capture
+- 每条 Capture 的唯一 ID
+- 每日 Markdown 只追加、不覆盖
+- 图片和本地文件作为普通附件保存，尽量保留原始格式
+- Finder/Explorer 文件优先，避免同一图片重复保存为文件和 bitmap
+- 失效 Vault 路径自动清理，不会在旧位置重新创建目录
+- 置顶悬浮入口、拖动把手、保存状态提示
+- 右键重新选择 Vault 或退出
 
-## 启动
+Capture、路径、附件命名、Markdown 和 append 行为全部位于共享 Dart 层；平台原生代码只负责剪贴板、文件夹选择、设置持久化和窗口行为。
 
-在项目目录中运行：
+## Vault 数据结构
 
-```powershell
-npm install
-npm start
-```
-
-启动后，桌面会出现一个始终置顶的小圆形悬浮入口。按住按钮顶部的“•••”把手即可拖动，关闭悬浮窗口即可退出应用。
-
-## 保存位置
-
-应用读取 Obsidian 的本地配置，优先选择当前打开且真实存在的仓库。采集内容保存到：
+macOS 和 Windows 的新版本统一写入：
 
 ```text
-<Obsidian 仓库>\Universal Capture\YYYY-MM-DD.md
+<Vault>/
+└── Universal Capture/
+    ├── 2026-08-22.md
+    └── attachments/
+        ├── 20260822-103215-a82f.png
+        └── ...
 ```
 
-例如，这台开发电脑当前会保存到：
-
-```text
-C:\Users\Yangy\Documents\Obsidian Vault\Universal Capture\2026-08-16.md
-```
-
-如果 `Universal Capture` 文件夹或当天文件不存在，第一次成功采集时会自动创建。同一天的所有内容追加到同一个文件；进入第二天后，自动创建新的日期文件。每条内容使用以下格式追加：
+每条记录格式：
 
 ```markdown
-## 2026-08-16 14:30:00
+## 10:32:15
 
-剪贴板中的原始文本
+<!-- capture:id=20260822-103215-a82f -->
+
+复制的文字
+
+![[attachments/20260822-103215-a82f.png]]
 
 ---
 ```
 
-如果未找到可用的 Obsidian 仓库，悬浮窗口会提示“未找到 Obsidian 仓库”，不会把内容写到其他位置。
+旧版本已经产生的 `素材/Inbox`、`素材/attachments` 或旧 `Universal Capture` 内容不会被删除或自动迁移。
 
-## 隐私
+## 目录结构
 
-- 只有主动点击悬浮按钮时才读取剪贴板。
-- 不在后台监听剪贴板。
-- 不连接网络，不上传采集内容。
-- 不需要账号，也不包含遥测。
-
-## 测试
-
-运行核心自动化测试：
-
-```powershell
-npm test
+```text
+INbox/
+├── app/                         # 唯一正式 Flutter 客户端
+│   ├── lib/                     # 共享模型、服务、路径与 UI
+│   ├── macos/                   # Swift/AppKit adapter
+│   ├── windows/                 # C++/Win32 adapter
+│   └── test/                    # 共享 Dart/Widget 测试
+├── legacy/
+│   └── electron-windows/        # 旧 Electron 参考实现，不再进入主线
+├── docs/superpowers/            # 当前架构设计和实施计划
+├── README.md
+└── PROJECT_STATE.md
 ```
 
-运行真实 Electron 剪贴板到临时 Markdown 文件的冒烟验证：
+## macOS 运行
 
-```powershell
-$env:UNIVERSAL_CAPTURE_SMOKE_PATH = Join-Path ([System.IO.Path]::GetTempPath()) 'universal-capture-smoke\captures.md'
-npm run smoke
+前置环境：Flutter 3.47.1、Dart 3.13.1、Xcode。当前工程使用 Swift Package Manager，不依赖 CocoaPods。
+
+```bash
+cd app
+flutter pub get
+flutter run -d macos
 ```
 
-验证成功时会显示 `SMOKE_OK`。冒烟验证使用临时文件，不会修改真实 Obsidian 仓库。
+验证：
 
-## 当前版本暂不包含
+```bash
+dart analyze lib test
+flutter test
+flutter build macos --debug
+```
 
-- AI 提取或分类
-- 云同步
-- 图片和 OCR
-- 网页来源识别
-- 自动去重
-- 全局快捷键、系统托盘和开机启动
-- 安装包
+## Windows 运行
+
+前置环境：Flutter 3.47.1、Visual Studio 2022，并安装“使用 C++ 的桌面开发”工作负载。
+
+```powershell
+cd app
+flutter pub get
+flutter run -d windows
+```
+
+构建验证：
+
+```powershell
+dart analyze lib test
+flutter test
+flutter build windows
+```
+
+`.github/workflows/windows-build.yml` 会在 Windows runner 上执行相同的最小构建检查。
+
+## Legacy Electron
+
+原 Windows Electron 客户端完整保留在 `legacy/electron-windows/`，用于追溯旧悬浮入口体验和历史行为。它不再是正式入口，也不应继续承载新功能。
+
+## 当前仍需人工验证
+
+- Windows runner 首次 `flutter build windows` 结果
+- Windows 文字、PNG/JPEG、bitmap、Explorer 文件和窗口交互真机测试
+- macOS 与 Windows 中 Obsidian 图片/PDF/视频 embed 的真实显示
+- macOS App Sandbox 仍为关闭状态；安装包、签名和分发不在本轮范围
+
+真实完成状态和最新验证记录见 [`PROJECT_STATE.md`](PROJECT_STATE.md)。

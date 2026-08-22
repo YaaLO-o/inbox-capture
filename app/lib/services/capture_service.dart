@@ -68,7 +68,7 @@ class CaptureService {
         );
       }
 
-      // 2) Finder 复制的本地文件：复制进 attachments（V0.1 顺带支持）。
+      // 2) Finder / Explorer 复制的本地文件：复制进 attachments。
       for (var i = 0; i < content.files.length; i++) {
         final src = content.files[i];
         final ext = _extensionOf(src);
@@ -115,8 +115,9 @@ class CaptureService {
   }
 
   String _extensionOf(String path) {
-    final dot = path.lastIndexOf('.');
-    if (dot < 0 || dot == path.length - 1) return '';
-    return path.substring(dot + 1).toLowerCase();
+    final fileName = path.replaceAll('\\', '/').split('/').last;
+    final dot = fileName.lastIndexOf('.');
+    if (dot <= 0 || dot == fileName.length - 1) return '';
+    return fileName.substring(dot + 1).toLowerCase();
   }
 }

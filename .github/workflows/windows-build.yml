@@ -1,0 +1,33 @@
+name: Windows build
+
+on:
+  push:
+    paths:
+      - 'app/**'
+      - '.github/workflows/windows-build.yml'
+  pull_request:
+    paths:
+      - 'app/**'
+      - '.github/workflows/windows-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.1'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: dart analyze lib test
+      - run: flutter test
+      - run: flutter build windows

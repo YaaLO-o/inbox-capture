@@ -89,8 +89,12 @@ class _OnboardingViewState extends State<OnboardingView> {
               ),
               const SizedBox(height: 8),
               const Text(
-                '采集内容将写入该 Vault 下的 素材/Inbox 与 素材/attachments 目录，目录不存在会自动创建。',
-                style: TextStyle(fontSize: 12.5, color: Color(0xFFB7B7C2), height: 1.5),
+                '采集内容将写入该 Vault 下的 Universal Capture 目录，附件保存在其中的 attachments 子目录。',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: Color(0xFFB7B7C2),
+                  height: 1.5,
+                ),
               ),
               const SizedBox(height: 18),
               InkWell(
@@ -98,7 +102,10 @@ class _OnboardingViewState extends State<OnboardingView> {
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF2A2A33),
                     borderRadius: BorderRadius.circular(10),
@@ -106,7 +113,11 @@ class _OnboardingViewState extends State<OnboardingView> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.folder_open_outlined, size: 18, color: Color(0xFFB7B7C2)),
+                      const Icon(
+                        Icons.folder_open_outlined,
+                        size: 18,
+                        color: Color(0xFFB7B7C2),
+                      ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
@@ -126,8 +137,10 @@ class _OnboardingViewState extends State<OnboardingView> {
               ),
               if (_error != null) ...[
                 const SizedBox(height: 10),
-                Text(_error!,
-                    style: const TextStyle(fontSize: 12, color: Colors.redAccent)),
+                Text(
+                  _error!,
+                  style: const TextStyle(fontSize: 12, color: Colors.redAccent),
+                ),
               ],
               const Spacer(),
               SizedBox(
