@@ -219,23 +219,115 @@ void main() {
     expect(captures, 0);
   });
 
-  testWidgets('disableAnimations skips blink shake and waiting loops', (
+  int currentFrame(WidgetTester tester) =>
+      tester.widget<PixelChestSprite>(find.byType(PixelChestSprite)).frameIndex;
+
+  testWidgets('disableAnimations keeps fast success open for 150ms', (
     tester,
   ) async {
-    final completer = Completer<CaptureResult>();
     await pumpPet(
       tester,
       disableAnimations: true,
-      onCapture: () => completer.future,
+      onCapture: () async => const CaptureResult(CaptureStatus.saved),
     );
 
     await tester.tap(find.bySemanticsLabel('保存到 INbox'));
-    await tester.pump(const Duration(milliseconds: 160));
-    expect(find.byKey(const Key('pet-waiting')), findsNothing);
+    await tester.pump();
+    expect(currentFrame(tester), 9);
+    expect(find.byKey(const Key('pet-state-capturing')), findsOneWidget);
 
-    completer.complete(const CaptureResult(CaptureStatus.error));
+    await tester.pump(const Duration(milliseconds: 149));
+    expect(currentFrame(tester), 9);
+    expect(find.byKey(const Key('pet-state-capturing')), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 1));
     await tester.pump();
+    expect(currentFrame(tester), 0);
+    expect(find.byKey(const Key('pet-state-idle')), findsOneWidget);
+  });
+
+  testWidgets(
+    'disableAnimations slow result never waits and closes on result',
+    (tester) async {
+      final completer = Completer<CaptureResult>();
+      await pumpPet(
+        tester,
+        disableAnimations: true,
+        onCapture: () => completer.future,
+      );
+
+      await tester.tap(find.bySemanticsLabel('保存到 INbox'));
+      await tester.pump(const Duration(milliseconds: 160));
+      expect(currentFrame(tester), 9);
+      expect(find.byKey(const Key('pet-waiting')), findsNothing);
+
+      completer.complete(const CaptureResult(CaptureStatus.saved));
+      await tester.pump();
+      await tester.pump();
+      expect(currentFrame(tester), 0);
+      expect(find.byKey(const Key('pet-state-idle')), findsOneWidget);
+      expect(find.byKey(const Key('pet-waiting')), findsNothing);
+    },
+  );
+
+  testWidgets('disableAnimations empty closes with fixed safe text', (
+    tester,
+  ) async {
+    await pumpPet(
+      tester,
+      disableAnimations: true,
+      onCapture: () async => const CaptureResult(
+        CaptureStatus.empty,
+        message: '/Users/name/private-vault: clipboard empty',
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel('保存到 INbox'));
+    await tester.pump(const Duration(milliseconds: 150));
     await tester.pump();
+
+    expect(currentFrame(tester), 0);
+    expect(find.text('剪贴板为空'), findsOneWidget);
+    expect(find.textContaining('private-vault'), findsNothing);
+  });
+
+  testWidgets('disableAnimations sync throw closes with fixed safe text', (
+    tester,
+  ) async {
+    await pumpPet(
+      tester,
+      disableAnimations: true,
+      onCapture: () {
+        throw StateError('/Users/name/private-vault: permission denied');
+      },
+    );
+
+    await tester.tap(find.bySemanticsLabel('保存到 INbox'));
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump();
+
+    expect(currentFrame(tester), 0);
     expect(find.text('保存失败'), findsOneWidget);
+    expect(find.textContaining('private-vault'), findsNothing);
+  });
+
+  testWidgets('disableAnimations rejected future closes with fixed safe text', (
+    tester,
+  ) async {
+    await pumpPet(
+      tester,
+      disableAnimations: true,
+      onCapture: () => Future<CaptureResult>.error(
+        StateError('/Users/name/private-vault: permission denied'),
+      ),
+    );
+
+    await tester.tap(find.bySemanticsLabel('保存到 INbox'));
+    await tester.pump(const Duration(milliseconds: 150));
+    await tester.pump();
+
+    expect(currentFrame(tester), 0);
+    expect(find.text('保存失败'), findsOneWidget);
+    expect(find.textContaining('private-vault'), findsNothing);
   });
 }
