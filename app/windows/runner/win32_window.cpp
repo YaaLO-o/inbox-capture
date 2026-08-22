@@ -17,6 +17,7 @@ namespace {
 #endif
 
 constexpr const wchar_t kWindowClassName[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
+constexpr COLORREF kTransparencyKey = RGB(255, 0, 255);
 
 /// Registry key for app theme preference.
 ///
@@ -135,12 +136,18 @@ bool Win32Window::Create(const std::wstring& title,
   double scale_factor = dpi / 96.0;
 
   HWND window = CreateWindowEx(
-      WS_EX_TOOLWINDOW | WS_EX_TOPMOST, window_class, title.c_str(), WS_POPUP,
+      WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_LAYERED, window_class,
+      title.c_str(), WS_POPUP,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
       Scale(size.width, scale_factor), Scale(size.height, scale_factor),
       nullptr, nullptr, GetModuleHandle(nullptr), this);
 
   if (!window) {
+    return false;
+  }
+
+  if (!SetLayeredWindowAttributes(window, kTransparencyKey, 255, LWA_COLORKEY)) {
+    DestroyWindow(window);
     return false;
   }
 

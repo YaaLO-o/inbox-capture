@@ -7,6 +7,7 @@ import '../services/capture_service.dart';
 import '../services/settings_service.dart';
 import 'pet/pixel_chest_pet.dart';
 import 'pet/pixel_chest_sprite.dart';
+import 'window_surface.dart';
 
 /// 两个平台共用的低摩擦悬浮采集入口。
 class CapturePill extends StatefulWidget {
@@ -69,7 +70,9 @@ class _CapturePillState extends State<CapturePill> {
       debugShowCheckedModeBanner: false,
       home: Builder(
         builder: (menuContext) => Scaffold(
-          backgroundColor: Colors.transparent,
+          backgroundColor: captureWindowSurfaceColor(
+            Theme.of(context).platform,
+          ),
           body: FutureBuilder<ui.Image>(
             future: _atlasFuture,
             builder: (context, snapshot) {
