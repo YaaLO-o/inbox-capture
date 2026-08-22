@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -154,5 +155,87 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
     expect(find.text('保存失败'), findsOneWidget);
     expect(find.textContaining('private-vault'), findsNothing);
+  });
+
+  testWidgets('drag handle moves without triggering capture', (tester) async {
+    final image = (await tester.runAsync(
+      () => loadPixelChestAtlas(rootBundle),
+    ))!;
+    var captures = 0;
+    final moves = <Offset>[];
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PixelChestPet(
+          atlas: image,
+          onCapture: () async {
+            captures += 1;
+            return const CaptureResult(CaptureStatus.saved);
+          },
+          onMove: moves.add,
+          onSecondaryTap: (_) {},
+        ),
+      ),
+    );
+
+    await tester.drag(
+      find.byKey(const Key('pet-drag-handle')),
+      const Offset(12, 7),
+    );
+    expect(moves, isNotEmpty);
+    expect(captures, 0);
+  });
+
+  testWidgets('right click reports its global position without capture', (
+    tester,
+  ) async {
+    final image = (await tester.runAsync(
+      () => loadPixelChestAtlas(rootBundle),
+    ))!;
+    var captures = 0;
+    Offset? menuPosition;
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PixelChestPet(
+          atlas: image,
+          onCapture: () async {
+            captures += 1;
+            return const CaptureResult(CaptureStatus.saved);
+          },
+          onMove: (_) {},
+          onSecondaryTap: (position) => menuPosition = position,
+        ),
+      ),
+    );
+
+    final center = tester.getCenter(find.bySemanticsLabel('保存到 INbox'));
+    final gesture = await tester.startGesture(
+      center,
+      buttons: kSecondaryMouseButton,
+    );
+    await gesture.up();
+    expect(menuPosition, isNotNull);
+    expect(captures, 0);
+  });
+
+  testWidgets('disableAnimations skips blink shake and waiting loops', (
+    tester,
+  ) async {
+    final completer = Completer<CaptureResult>();
+    await pumpPet(
+      tester,
+      disableAnimations: true,
+      onCapture: () => completer.future,
+    );
+
+    await tester.tap(find.bySemanticsLabel('保存到 INbox'));
+    await tester.pump(const Duration(milliseconds: 160));
+    expect(find.byKey(const Key('pet-waiting')), findsNothing);
+
+    completer.complete(const CaptureResult(CaptureStatus.error));
+    await tester.pump();
+    await tester.pump();
+    expect(find.text('保存失败'), findsOneWidget);
   });
 }

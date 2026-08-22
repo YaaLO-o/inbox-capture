@@ -36,35 +36,72 @@ class _PixelChestPetState extends State<PixelChestPet>
   String? _feedback;
   Timer? _feedbackTimer;
   Timer? _idleBlinkTimer;
+  bool? _disableAnimations;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(vsync: this)..addListener(_updateFrame);
-    _scheduleIdleBlink();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    if (_disableAnimations == disableAnimations) return;
+    _disableAnimations = disableAnimations;
+    if (disableAnimations) {
+      _cancelIdleBlink();
+      if (_state == PetAnimationState.idle) {
+        _controller.stop();
+        _sequence = PixelChestAtlas.idle;
+        _frameIndex = PixelChestAtlas.idle.frames.first;
+      }
+    } else if (_state == PetAnimationState.idle) {
+      _scheduleIdleBlink();
+    }
   }
 
   Future<void> _capture() async {
     if (_state != PetAnimationState.idle) return;
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
     _cancelIdleBlink();
     _feedbackTimer?.cancel();
-    _setState(PetAnimationState.capturing);
+
+    final resultFuture = _captureResultFuture();
+
+    if (disableAnimations) {
+      _controller.stop();
+      _sequence = PixelChestAtlas.capture;
+      setState(() {
+        _state = PetAnimationState.capturing;
+        _waiting = false;
+        _feedback = null;
+        _frameIndex = PixelChestAtlas.capture.frames.last;
+      });
+      _finishReducedCapture(resultFuture);
+      return;
+    }
 
     CaptureResult? readyResult;
-    final Future<CaptureResult> resultFuture = Future.sync(widget.onCapture)
-        .catchError((Object _) => const CaptureResult(CaptureStatus.error));
-    resultFuture.then((value) => readyResult = value);
-
+    resultFuture.then(
+      (value) => readyResult = value,
+      onError: (Object _) =>
+          readyResult = const CaptureResult(CaptureStatus.error),
+    );
+    _setState(PetAnimationState.capturing);
     await _play(PixelChestAtlas.capture);
     if (!mounted) return;
 
-    final CaptureResult result;
+    CaptureResult result = const CaptureResult(CaptureStatus.error);
     if (readyResult != null) {
       result = readyResult!;
     } else {
       setState(() => _waiting = true);
       _playLoop(PixelChestAtlas.waiting);
-      result = await resultFuture;
+      try {
+        result = await resultFuture;
+      } catch (_) {}
       if (!mounted) return;
       setState(() => _waiting = false);
       _controller.stop();
@@ -92,6 +129,40 @@ class _PixelChestPetState extends State<PixelChestPet>
     _setState(PetAnimationState.idle);
     _scheduleFeedbackClear();
     _scheduleIdleBlink();
+  }
+
+  Future<CaptureResult> _captureResultFuture() {
+    try {
+      return widget.onCapture();
+    } catch (_) {
+      return Future.value(const CaptureResult(CaptureStatus.error));
+    }
+  }
+
+  Future<void> _finishReducedCapture(Future<CaptureResult> resultFuture) async {
+    final minimumDelay = Completer<void>();
+    Future<void>.delayed(
+      const Duration(milliseconds: 150),
+      minimumDelay.complete,
+    );
+
+    CaptureResult result = const CaptureResult(CaptureStatus.error);
+    try {
+      result = await resultFuture;
+    } catch (_) {}
+    if (!minimumDelay.isCompleted) await minimumDelay.future;
+    if (!mounted) return;
+    setState(() {
+      _state = PetAnimationState.idle;
+      _sequence = PixelChestAtlas.idle;
+      _frameIndex = PixelChestAtlas.idle.frames.first;
+      _feedback = switch (result.status) {
+        CaptureStatus.saved => null,
+        CaptureStatus.empty => '剪贴板为空',
+        CaptureStatus.error => '保存失败',
+      };
+    });
+    _scheduleFeedbackClear();
   }
 
   Future<void> _play(PetFrameSequence sequence) {
@@ -141,6 +212,7 @@ class _PixelChestPetState extends State<PixelChestPet>
 
   void _scheduleIdleBlink() {
     _cancelIdleBlink();
+    if (_disableAnimations == true) return;
     _idleBlinkTimer = Timer(
       Duration(seconds: 20 + Random().nextInt(26)),
       () async {
@@ -170,52 +242,73 @@ class _PixelChestPetState extends State<PixelChestPet>
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        key: _stateMarkerKey,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox.square(
-            dimension: PixelChestAtlas.displaySize,
-            child: Stack(
-              children: [
-                PixelChestSprite(image: widget.atlas, frameIndex: _frameIndex),
-                Positioned(
-                  left: PixelChestAtlas.bodyLeft,
-                  top: PixelChestAtlas.bodyTop + PixelChestAtlas.dragHeight,
-                  width: PixelChestAtlas.bodyWidth,
-                  height:
-                      PixelChestAtlas.bodyHeight - PixelChestAtlas.dragHeight,
-                  child: Semantics(
-                    button: true,
-                    label: '保存到 INbox',
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _capture,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onSecondaryTapUp: (details) =>
+            widget.onSecondaryTap(details.globalPosition),
+        child: Column(
+          key: _stateMarkerKey,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox.square(
+              dimension: PixelChestAtlas.displaySize,
+              child: Stack(
+                children: [
+                  PixelChestSprite(
+                    image: widget.atlas,
+                    frameIndex: _frameIndex,
+                  ),
+                  Positioned(
+                    left: PixelChestAtlas.bodyLeft,
+                    top: PixelChestAtlas.bodyTop + PixelChestAtlas.dragHeight,
+                    width: PixelChestAtlas.bodyWidth,
+                    height:
+                        PixelChestAtlas.bodyHeight - PixelChestAtlas.dragHeight,
+                    child: Semantics(
+                      button: true,
+                      label: '保存到 INbox',
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _capture,
+                      ),
                     ),
                   ),
-                ),
-              ],
+                  Positioned(
+                    left: PixelChestAtlas.bodyLeft,
+                    top: PixelChestAtlas.bodyTop,
+                    width: PixelChestAtlas.bodyWidth,
+                    height: PixelChestAtlas.dragHeight,
+                    child: GestureDetector(
+                      key: const Key('pet-drag-handle'),
+                      behavior: HitTestBehavior.opaque,
+                      onPanUpdate: (details) => widget.onMove(details.delta),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          AnimatedOpacity(
-            opacity: _feedback == null ? 0 : 1,
-            duration: const Duration(milliseconds: 120),
-            child: SizedBox(
-              width: 116,
-              height: 20,
-              child: ColoredBox(
-                color: const Color(0xFFF4EBDD),
-                child: Center(
-                  child: Text(
-                    _feedback ?? '',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+            AnimatedOpacity(
+              opacity: _feedback == null ? 0 : 1,
+              duration: _disableAnimations == true
+                  ? Duration.zero
+                  : const Duration(milliseconds: 120),
+              child: SizedBox(
+                width: 116,
+                height: 20,
+                child: ColoredBox(
+                  color: const Color(0xFFF4EBDD),
+                  child: Center(
+                    child: Text(
+                      _feedback ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
