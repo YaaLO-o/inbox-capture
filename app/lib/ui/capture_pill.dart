@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../services/capture_service.dart';
 import '../services/settings_service.dart';
-import 'window_sizes.dart';
 
-/// 悬浮入口胶囊：点击即读取剪贴板并保存（见《方案》第十一节）。
+/// 两个平台共用的低摩擦悬浮采集入口。
 class CapturePill extends StatefulWidget {
   final String vaultPath;
   final CaptureService capture;
@@ -22,18 +21,10 @@ class CapturePill extends StatefulWidget {
 }
 
 class _CapturePillState extends State<CapturePill> {
+  static final SettingsService _settings = SettingsService();
+
   bool _busy = false;
   String? _flash;
-  Color? _flashColor;
-
-  @override
-  void initState() {
-    super.initState();
-    // 缩回小胶囊。
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // 尺寸由原生窗口在创建时给定；这里无需再次调整，但保留钩子。
-    });
-  }
 
   Future<void> _doCapture() async {
     if (_busy) return;
@@ -42,20 +33,11 @@ class _CapturePillState extends State<CapturePill> {
     if (!mounted) return;
     setState(() {
       _busy = false;
-      switch (result.status) {
-        case CaptureStatus.saved:
-          _flash = '✓ 已保存';
-          _flashColor = const Color(0xFF2E7D4F);
-          break;
-        case CaptureStatus.empty:
-          _flash = result.message ?? '剪贴板为空';
-          _flashColor = const Color(0xFF6E6E78);
-          break;
-        case CaptureStatus.error:
-          _flash = '保存失败';
-          _flashColor = const Color(0xFFB23B3B);
-          break;
-      }
+      _flash = switch (result.status) {
+        CaptureStatus.saved => '已保存',
+        CaptureStatus.empty => result.message ?? '剪贴板为空',
+        CaptureStatus.error => '保存失败',
+      };
     });
     Future.delayed(const Duration(milliseconds: 1400), () {
       if (mounted) setState(() => _flash = null);
@@ -65,70 +47,205 @@ class _CapturePillState extends State<CapturePill> {
   void _showMenu(BuildContext context, Offset position) {
     showMenu<String>(
       context: context,
-      position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx + 1, position.dy + 1),
+      position: RelativeRect.fromLTRB(
+        position.dx,
+        position.dy,
+        position.dx + 1,
+        position.dy + 1,
+      ),
       color: const Color(0xFF2A2A33),
       items: const [
-        PopupMenuItem(value: 'vault', child: Text('重新选择 Vault', style: TextStyle(fontSize: 12.5))),
-        PopupMenuItem(value: 'quit', child: Text('退出', style: TextStyle(fontSize: 12.5))),
+        PopupMenuItem(
+          value: 'vault',
+          child: Text('重新选择 Vault', style: TextStyle(fontSize: 12.5)),
+        ),
+        PopupMenuItem(
+          value: 'quit',
+          child: Text('退出', style: TextStyle(fontSize: 12.5)),
+        ),
       ],
-    ).then((v) {
+    ).then((value) {
       if (!mounted) return;
-      if (v == 'vault') widget.onChangeVault();
-      if (v == 'quit') {
-        _settings.quit();
-      }
+      if (value == 'vault') widget.onChangeVault();
+      if (value == 'quit') _settings.quit();
     });
   }
 
-  // 仅用于退出等系统操作。
-  static final SettingsService _settings = SettingsService();
-
   @override
   Widget build(BuildContext context) {
-    final label = _flash ?? (_busy ? '保存中…' : '采集');
-    final color = _flashColor ?? const Color(0xFF7C5CFF);
+    final status = _flash ?? (_busy ? '正在保存…' : '点击保存');
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Center(
-          child: GestureDetector(
-            onTap: _doCapture,
-            onSecondaryTapUp: (d) => _showMenu(context, d.globalPosition),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: WindowSizes.pillWidth - 16,
-              height: WindowSizes.pillHeight - 16,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x55000000),
-                    blurRadius: 12,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+      home: Builder(
+        builder: (menuContext) => Scaffold(
+          backgroundColor: Colors.transparent,
+          body: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onSecondaryTapUp: (details) =>
+                _showMenu(menuContext, details.globalPosition),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (_busy)
-                    const SizedBox(
-                      width: 14, height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  else
-                    const Icon(Icons.download_rounded, size: 16, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Text(label,
-                      style: const TextStyle(
-                          color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w600)),
+                  _DragHandle(
+                    onMove: (dx, dy) => _settings.moveWindowBy(dx, dy),
+                  ),
+                  const SizedBox(height: 4),
+                  GestureDetector(
+                    onTap: _doCapture,
+                    child: AnimatedScale(
+                      scale: _busy ? 0.96 : 1,
+                      duration: const Duration(milliseconds: 120),
+                      child: _CaptureButton(busy: _busy),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  _StatusLabel(text: status),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DragHandle extends StatelessWidget {
+  final void Function(double dx, double dy) onMove;
+
+  const _DragHandle({required this.onMove});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanUpdate: (details) => onMove(details.delta.dx, details.delta.dy),
+      child: Container(
+        width: 44,
+        height: 14,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xEEFFFFFF),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x24372768),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Text(
+          '•••',
+          style: TextStyle(
+            color: Color(0xBF44366E),
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.5,
+            height: 0.8,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CaptureButton extends StatelessWidget {
+  final bool busy;
+
+  const _CaptureButton({required this.busy});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 78,
+      height: 78,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF7D6), Color(0xFFFFD98C)],
+        ),
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x3D372768),
+            blurRadius: 20,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          if (busy)
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFF3C2F68),
+              ),
+            )
+          else ...[
+            const Text(
+              '•  •',
+              style: TextStyle(
+                color: Color(0xFF3C2F68),
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '收',
+              style: TextStyle(
+                color: Color(0xFF3C2F68),
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusLabel extends StatelessWidget {
+  final String text;
+
+  const _StatusLabel({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 116),
+      height: 20,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xEFFFFFFF),
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x26372768),
+            blurRadius: 10,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Text(
+        text,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: Color(0xFF44366E),
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

@@ -117,6 +117,14 @@ enum SettingsChannel {
         }
         setWindowSize(controller: controller, width: w, height: h)
         result(nil)
+      case "moveWindowBy":
+        guard let args = call.arguments as? [String: Any],
+              let dx = args["dx"] as? Double,
+              let dy = args["dy"] as? Double else {
+          result(FlutterError(code: "BAD_ARGS", message: "moveWindowBy 需要 dx/dy", details: nil)); return
+        }
+        moveWindowBy(controller: controller, dx: dx, dy: dy)
+        result(nil)
       case "quit":
         NSApp.terminate(nil)
         result(nil)
@@ -134,6 +142,14 @@ enum SettingsChannel {
     frame.origin.y += frame.size.height - CGFloat(height)
     frame.size = newSize
     window.animator().setFrame(frame, display: true)
+  }
+
+  private static func moveWindowBy(controller: FlutterViewController, dx: Double, dy: Double) {
+    guard let window = controller.view.window else { return }
+    window.setFrameOrigin(NSPoint(
+      x: window.frame.origin.x + CGFloat(dx),
+      y: window.frame.origin.y - CGFloat(dy)
+    ))
   }
 
   private static func pickFolder() -> String? {

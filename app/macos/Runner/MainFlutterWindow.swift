@@ -19,8 +19,8 @@ class MainFlutterWindow: NSWindow {
 
   /// V0.1：一个轻量、可拖拽、置顶的悬浮入口（见《方案》第十一节）。
   private func configureFloatingWindow(flutterViewController: FlutterViewController) {
-    // 初始尺寸：一个小胶囊按钮。
-    let size = NSSize(width: 120, height: 56)
+    // 初始尺寸：拖动把手、圆形采集入口与状态区。
+    let size = NSSize(width: 132, height: 132)
     let screenFrame = NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
     let origin = NSPoint(
       x: screenFrame.maxX - size.width - 24,

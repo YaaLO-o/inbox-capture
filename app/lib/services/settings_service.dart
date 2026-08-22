@@ -36,6 +36,10 @@ class SettingsService {
   Future<void> setWindowSize(double width, double height) => _channel
       .invokeMethod('setWindowSize', {'width': width, 'height': height});
 
+  /// 按 Flutter 逻辑像素移动原生桌面窗口。
+  Future<void> moveWindowBy(double dx, double dy) =>
+      _channel.invokeMethod('moveWindowBy', {'dx': dx, 'dy': dy});
+
   /// 退出应用。
   Future<void> quit() => _channel.invokeMethod('quit');
 }
