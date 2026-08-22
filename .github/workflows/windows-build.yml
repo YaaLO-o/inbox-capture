@@ -9,6 +9,7 @@ on:
     paths:
       - 'app/**'
       - '.github/workflows/windows-build.yml'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -22,12 +23,72 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.47.1'
           channel: stable
           cache: true
-      - run: flutter pub get
-      - run: dart analyze lib test
-      - run: flutter test
-      - run: flutter build windows
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      # 每一步都把输出写到日志文件；用 continue-on-error 保证即便失败也继续，
+      # 最后由 verify 步骤统一判定作业成败。这样无论构建是否失败，都能拿到完整日志与产物。
+      - name: dart analyze
+        id: analyze
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          & dart analyze lib test 2>&1 | Tee-Object -FilePath ..\analyze.log
+          echo "analyze_exit=$LASTEXITCODE" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: flutter test
+        id: test
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          & flutter test 2>&1 | Tee-Object -FilePath ..\test.log
+          echo "test_exit=$LASTEXITCODE" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: flutter build windows (verbose)
+        id: build
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          # -v 输出完整构建日志；同时收集 CMake/MSBuild 信息，便于定位 C++ 原生层错误。
+          & flutter build windows -v 2>&1 | Tee-Object -FilePath ..\build-windows.log
+          echo "build_exit=$LASTEXITCODE" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Upload complete logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-logs
+          if-no-files-found: warn
+          path: |
+            analyze.log
+            test.log
+            build-windows.log
+
+      - name: Upload built artifacts (if any)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-output
+          if-no-files-found: warn
+          path: |
+            app/build/windows/x64/runner/Release/**
+
+      - name: Verify all steps succeeded
+        shell: pwsh
+        run: |
+          $failed = @()
+          if ("$env:analyze_exit" -ne "0") { $failed += "dart analyze (exit $env:analyze_exit)" }
+          if ("$env:test_exit" -ne "0")    { $failed += "flutter test (exit $env:test_exit)" }
+          if ("$env:build_exit" -ne "0")   { $failed += "flutter build windows (exit $env:build_exit)" }
+          if ($failed.Count -gt 0) {
+            echo "::error::Windows build failed: $($failed -join ', '). Full logs and any partial artifacts are uploaded as workflow artifacts."
+            exit 1
+          }
+          echo "All Windows build steps succeeded."
