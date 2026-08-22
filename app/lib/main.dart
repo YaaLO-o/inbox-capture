@@ -38,7 +38,7 @@ class _InboxAppState extends State<InboxApp> {
   }
 
   Future<void> _boot() async {
-    final path = await _settings.getVaultPath();
+    final path = await _settings.loadValidVaultPath();
     if (!mounted) return;
     setState(() {
       _vaultPath = path;
@@ -52,12 +52,17 @@ class _InboxAppState extends State<InboxApp> {
 
   Future<void> _onVaultSelected(String path) async {
     setState(() => _vaultPath = path);
-    await _settings.setWindowSize(WindowSizes.pillWidth, WindowSizes.pillHeight);
+    await _settings.setWindowSize(
+      WindowSizes.pillWidth,
+      WindowSizes.pillHeight,
+    );
   }
 
   Future<void> _changeVault() async {
     await _settings.setWindowSize(
-        WindowSizes.onboardingWidth, WindowSizes.onboardingHeight);
+      WindowSizes.onboardingWidth,
+      WindowSizes.onboardingHeight,
+    );
     final path = await _settings.pickFolder();
     if (!mounted) return;
     if (path != null) {
@@ -67,7 +72,9 @@ class _InboxAppState extends State<InboxApp> {
     } else if (_vaultPath != null) {
       // 取消选择，回到胶囊。
       await _settings.setWindowSize(
-          WindowSizes.pillWidth, WindowSizes.pillHeight);
+        WindowSizes.pillWidth,
+        WindowSizes.pillHeight,
+      );
     }
   }
 

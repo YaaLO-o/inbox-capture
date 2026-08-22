@@ -103,6 +103,9 @@ enum SettingsChannel {
         } else {
           result(FlutterError(code: "BAD_ARGS", message: "setVaultPath 需要 path", details: nil))
         }
+      case "clearVaultPath":
+        UserDefaults.standard.removeObject(forKey: vaultKey)
+        result(nil)
       case "pickFolder":
         result(pickFolder())
       case "setWindowSize":
