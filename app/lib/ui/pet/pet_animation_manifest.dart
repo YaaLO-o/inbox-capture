@@ -79,7 +79,7 @@ abstract final class PixelChestAtlas {
     frameDuration: Duration(milliseconds: 96),
   );
   static const empty = PetFrameSequence(
-    frames: [16, 21, 19, 15],
+    frames: [12, 21, 13, 15],
     frameDuration: Duration(milliseconds: 120),
   );
 }

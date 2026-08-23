@@ -34,6 +34,7 @@ class _PixelChestPetState extends State<PixelChestPet>
   int _frameIndex = PixelChestAtlas.idle.frames.first;
   bool _waiting = false;
   String? _feedback;
+  bool _feedbackVisible = false;
   Timer? _feedbackTimer;
   Timer? _idleBlinkTimer;
   bool? _disableAnimations;
@@ -68,9 +69,10 @@ class _PixelChestPetState extends State<PixelChestPet>
     _cancelIdleBlink();
     _feedbackTimer?.cancel();
 
-    final resultFuture = _captureResultFuture();
-
     if (disableAnimations) {
+      final minimumDisplay = Future<void>.delayed(
+        const Duration(milliseconds: 150),
+      );
       _controller.stop();
       _sequence = PixelChestAtlas.capture;
       setState(() {
@@ -79,18 +81,25 @@ class _PixelChestPetState extends State<PixelChestPet>
         _feedback = null;
         _frameIndex = PixelChestAtlas.capture.frames.last;
       });
-      _finishReducedCapture(resultFuture);
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+      final resultFuture = _captureResultFuture();
+      _finishReducedCapture(resultFuture, minimumDisplay);
       return;
     }
 
+    _setState(PetAnimationState.capturing);
+    final capturePlayback = _play(PixelChestAtlas.capture);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return;
+    final resultFuture = _captureResultFuture();
     CaptureResult? readyResult;
     resultFuture.then(
       (value) => readyResult = value,
       onError: (Object _) =>
           readyResult = const CaptureResult(CaptureStatus.error),
     );
-    _setState(PetAnimationState.capturing);
-    await _play(PixelChestAtlas.capture);
+    await capturePlayback;
     if (!mounted) return;
 
     CaptureResult result = const CaptureResult(CaptureStatus.error);
@@ -114,12 +123,12 @@ class _PixelChestPetState extends State<PixelChestPet>
         await _play(PixelChestAtlas.success);
         break;
       case CaptureStatus.empty:
-        setState(() => _feedback = '剪贴板为空');
+        _showFeedback('剪贴板为空');
         _setState(PetAnimationState.error);
         await _play(PixelChestAtlas.empty);
         break;
       case CaptureStatus.error:
-        setState(() => _feedback = '保存失败');
+        _showFeedback('保存失败');
         _setState(PetAnimationState.error);
         await _play(PixelChestAtlas.error);
         break;
@@ -127,7 +136,6 @@ class _PixelChestPetState extends State<PixelChestPet>
 
     if (!mounted) return;
     _setState(PetAnimationState.idle);
-    _scheduleFeedbackClear();
     _scheduleIdleBlink();
   }
 
@@ -139,18 +147,15 @@ class _PixelChestPetState extends State<PixelChestPet>
     }
   }
 
-  Future<void> _finishReducedCapture(Future<CaptureResult> resultFuture) async {
-    final minimumDelay = Completer<void>();
-    Future<void>.delayed(
-      const Duration(milliseconds: 150),
-      minimumDelay.complete,
-    );
-
+  Future<void> _finishReducedCapture(
+    Future<CaptureResult> resultFuture,
+    Future<void> minimumDisplay,
+  ) async {
     CaptureResult result = const CaptureResult(CaptureStatus.error);
     try {
       result = await resultFuture;
     } catch (_) {}
-    if (!minimumDelay.isCompleted) await minimumDelay.future;
+    await minimumDisplay;
     if (!mounted) return;
     setState(() {
       _state = PetAnimationState.idle;
@@ -161,6 +166,7 @@ class _PixelChestPetState extends State<PixelChestPet>
         CaptureStatus.empty => '剪贴板为空',
         CaptureStatus.error => '保存失败',
       };
+      _feedbackVisible = _feedback != null;
     });
     _scheduleFeedbackClear();
   }
@@ -198,15 +204,45 @@ class _PixelChestPetState extends State<PixelChestPet>
       _state = state;
       if (state == PetAnimationState.capturing) {
         _feedback = null;
+        _feedbackVisible = false;
       }
     });
   }
 
+  void _showFeedback(String feedback) {
+    setState(() {
+      _feedback = feedback;
+      _feedbackVisible = true;
+    });
+    _scheduleFeedbackClear();
+  }
+
+  Duration get _feedbackFadeDuration =>
+      _disableAnimations == true ||
+          Theme.of(context).platform == TargetPlatform.windows
+      ? Duration.zero
+      : const Duration(milliseconds: 120);
+
   void _scheduleFeedbackClear() {
     _feedbackTimer?.cancel();
     if (_feedback == null) return;
-    _feedbackTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _feedback = null);
+    final fadeDuration = _feedbackFadeDuration;
+    final visibleDuration = Duration(
+      milliseconds: 1400 - fadeDuration.inMilliseconds,
+    );
+    _feedbackTimer = Timer(visibleDuration, () {
+      if (!mounted) return;
+      if (fadeDuration == Duration.zero) {
+        setState(() {
+          _feedbackVisible = false;
+          _feedback = null;
+        });
+        return;
+      }
+      setState(() => _feedbackVisible = false);
+      _feedbackTimer = Timer(fadeDuration, () {
+        if (mounted) setState(() => _feedback = null);
+      });
     });
   }
 
@@ -242,73 +278,86 @@ class _PixelChestPetState extends State<PixelChestPet>
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onSecondaryTapUp: (details) =>
-            widget.onSecondaryTap(details.globalPosition),
-        child: Column(
-          key: _stateMarkerKey,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox.square(
-              dimension: PixelChestAtlas.displaySize,
-              child: Stack(
-                children: [
-                  PixelChestSprite(
-                    image: widget.atlas,
-                    frameIndex: _frameIndex,
-                  ),
-                  Positioned(
-                    left: PixelChestAtlas.bodyLeft,
-                    top: PixelChestAtlas.bodyTop + PixelChestAtlas.dragHeight,
-                    width: PixelChestAtlas.bodyWidth,
-                    height:
-                        PixelChestAtlas.bodyHeight - PixelChestAtlas.dragHeight,
-                    child: Semantics(
-                      button: true,
-                      label: '保存到 INbox',
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: _capture,
-                      ),
+      child: Column(
+        key: _stateMarkerKey,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox.square(
+            dimension: PixelChestAtlas.displaySize,
+            child: Stack(
+              children: [
+                PixelChestSprite(image: widget.atlas, frameIndex: _frameIndex),
+                Positioned(
+                  left: PixelChestAtlas.bodyLeft,
+                  top: PixelChestAtlas.bodyTop,
+                  width: PixelChestAtlas.bodyWidth,
+                  height: PixelChestAtlas.bodyHeight,
+                  child: GestureDetector(
+                    key: const Key('pet-visible-region'),
+                    behavior: HitTestBehavior.opaque,
+                    onSecondaryTapUp: (details) =>
+                        widget.onSecondaryTap(details.globalPosition),
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          top: PixelChestAtlas.dragHeight,
+                          width: PixelChestAtlas.bodyWidth,
+                          height:
+                              PixelChestAtlas.bodyHeight -
+                              PixelChestAtlas.dragHeight,
+                          child: Semantics(
+                            button: true,
+                            label: '保存到 INbox',
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: _capture,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          width: PixelChestAtlas.bodyWidth,
+                          height: PixelChestAtlas.dragHeight,
+                          child: GestureDetector(
+                            key: const Key('pet-drag-handle'),
+                            behavior: HitTestBehavior.opaque,
+                            onPanUpdate: (details) =>
+                                widget.onMove(details.delta),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Positioned(
-                    left: PixelChestAtlas.bodyLeft,
-                    top: PixelChestAtlas.bodyTop,
-                    width: PixelChestAtlas.bodyWidth,
-                    height: PixelChestAtlas.dragHeight,
-                    child: GestureDetector(
-                      key: const Key('pet-drag-handle'),
-                      behavior: HitTestBehavior.opaque,
-                      onPanUpdate: (details) => widget.onMove(details.delta),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            AnimatedOpacity(
-              opacity: _feedback == null ? 0 : 1,
-              duration: _disableAnimations == true
-                  ? Duration.zero
-                  : const Duration(milliseconds: 120),
-              child: SizedBox(
-                width: 116,
-                height: 20,
-                child: ColoredBox(
-                  color: const Color(0xFFF4EBDD),
-                  child: Center(
-                    child: Text(
-                      _feedback ?? '',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+          ),
+          AnimatedOpacity(
+            opacity: _feedbackVisible ? 1 : 0,
+            duration: _feedbackFadeDuration,
+            child: IgnorePointer(
+              ignoring: _feedback == null,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onSecondaryTapUp: (details) =>
+                    widget.onSecondaryTap(details.globalPosition),
+                child: SizedBox(
+                  width: 116,
+                  height: 20,
+                  child: ColoredBox(
+                    color: const Color(0xFFF4EBDD),
+                    child: Center(
+                      child: Text(
+                        _feedback ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

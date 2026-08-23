@@ -77,6 +77,8 @@ void main() {
     await pumpPill(tester, capture: capture);
 
     await tester.tap(find.bySemanticsLabel('保存到 INbox'));
+    expect(capture.calls, 0);
+    await tester.pump();
 
     expect(capture.calls, 1);
   });
