@@ -90,6 +90,11 @@ hdiutil create \
 echo "==> cleaning staging"
 /bin/rm -rf "$STAGING_DIR"
 
+# 同时生成一个固定文件名副本，供 README 的「直接下载」直链
+# (releases/latest/download/INbox-macos-universal.dmg) 在任何最新版都持续有效。
+LATEST_DMG="$DIST_DIR/${APP_NAME}-macos-universal.dmg"
+/bin/cp -f "$DMG_PATH" "$LATEST_DMG"
+
 # 架构与校验信息
 ARCHS=$(lipo -archs "$RELEASE_APP/Contents/MacOS/${APP_NAME}" 2>/dev/null || echo "unknown")
 SIZE=$(du -h "$DMG_PATH" | cut -f1)
@@ -97,6 +102,7 @@ SHA256=$(shasum -a 256 "$DMG_PATH" | cut -d' ' -f1)
 
 echo ""
 echo "==> Done"
-echo "    DMG : $DMG_PATH ($SIZE)"
+echo "    DMG (versioned): $DMG_PATH ($SIZE)"
+echo "    DMG (latest)   : $LATEST_DMG"
 echo "    Arch: $ARCHS"
 echo "    SHA256: $SHA256"

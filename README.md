@@ -26,9 +26,13 @@
 
 当前提供 **macOS（Apple Silicon + Intel，Universal）** 版本：
 
-👉 **[在 Releases 下载最新版 INbox](https://github.com/YaaLO-o/inbox-capture/releases/latest)**
+<h3 align="center">
+  <a href="https://github.com/YaaLO-o/inbox-capture/releases/latest/download/INbox-macos-universal.dmg"><b>⬇ 下载 INbox for macOS（Universal DMG）</b></a>
+</h3>
 
-下载 `.dmg`，双击打开，把 `INbox` 拖入「应用程序 / Applications」即完成安装。
+点击上方按钮直接开始下载最新版 `.dmg`，双击打开，把 `INbox` 拖入「应用程序 / Applications」即完成安装。
+
+> 想看更新日志、历史版本或校验值，请前往 [Releases 页面](https://github.com/YaaLO-o/inbox-capture/releases/latest)。
 
 > 首次打开若提示「无法验证开发者」或「已损坏」，请**右键 → 打开**，或参阅 [安装指南](.github/DOWNLOAD.md)。这是因为当前版本尚未购买 Apple Developer ID 进行签名和公证，应用本身完全本地运行、不联网。
 
