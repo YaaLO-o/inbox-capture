@@ -300,7 +300,9 @@ void main() {
     expect(find.text('剪贴板为空'), findsNothing);
   });
 
-  testWidgets('drag handle moves without triggering capture', (tester) async {
+  testWidgets('dragging the pet body moves without triggering capture', (
+    tester,
+  ) async {
     final image = (await tester.runAsync(
       () => loadPixelChestAtlas(rootBundle),
     ))!;
@@ -322,8 +324,8 @@ void main() {
     );
 
     await tester.drag(
-      find.byKey(const Key('pet-drag-handle')),
-      const Offset(12, 7),
+      find.byKey(const Key('pet-visible-region')),
+      const Offset(30, 20),
     );
     expect(moves, isNotEmpty);
     expect(captures, 0);

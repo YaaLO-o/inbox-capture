@@ -95,8 +95,8 @@ void main() {
     await pumpPill(tester, capture: capture);
 
     await tester.drag(
-      find.byKey(const Key('pet-drag-handle')),
-      const Offset(12, 7),
+      find.byKey(const Key('pet-visible-region')),
+      const Offset(30, 20),
     );
     await tester.pump();
 

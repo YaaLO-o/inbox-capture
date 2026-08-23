@@ -292,39 +292,16 @@ class _PixelChestPetState extends State<PixelChestPet>
                   top: PixelChestAtlas.bodyTop,
                   width: PixelChestAtlas.bodyWidth,
                   height: PixelChestAtlas.bodyHeight,
-                  child: GestureDetector(
-                    key: const Key('pet-visible-region'),
-                    behavior: HitTestBehavior.opaque,
-                    onSecondaryTapUp: (details) =>
-                        widget.onSecondaryTap(details.globalPosition),
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          top: PixelChestAtlas.dragHeight,
-                          width: PixelChestAtlas.bodyWidth,
-                          height:
-                              PixelChestAtlas.bodyHeight -
-                              PixelChestAtlas.dragHeight,
-                          child: Semantics(
-                            button: true,
-                            label: '保存到 INbox',
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: _capture,
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          width: PixelChestAtlas.bodyWidth,
-                          height: PixelChestAtlas.dragHeight,
-                          child: GestureDetector(
-                            key: const Key('pet-drag-handle'),
-                            behavior: HitTestBehavior.opaque,
-                            onPanUpdate: (details) =>
-                                widget.onMove(details.delta),
-                          ),
-                        ),
-                      ],
+                  child: Semantics(
+                    button: true,
+                    label: '保存到 INbox',
+                    child: GestureDetector(
+                      key: const Key('pet-visible-region'),
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _capture,
+                      onPanUpdate: (details) => widget.onMove(details.delta),
+                      onSecondaryTapUp: (details) =>
+                          widget.onSecondaryTap(details.globalPosition),
                     ),
                   ),
                 ),

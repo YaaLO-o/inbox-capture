@@ -25,7 +25,6 @@ abstract final class PixelChestAtlas {
   static const pixelWidth = columns * cellSize;
   static const pixelHeight = rows * cellSize;
   static const displaySize = 96.0;
-  static const dragHeight = 12.0;
   static const bodyLeft = 12.0;
   static const bodyTop = 36.0;
   static const bodyWidth = 72.0;
