@@ -50,6 +50,12 @@ macOS 和 Windows 的新版本统一写入：
 ---
 ```
 
+## Capture 与 Knowledge 决策
+
+- Obsidian 支持预览的图片附件使用 embed；PDF、视频、Office、ZIP 和其他普通文件使用普通链接。Finder/Explorer 文件的非图片链接会显示安全处理后的原始 basename；普通剪贴板图片没有原始名，因此不生成 alias。
+- AI 分类、标签、embedding 和语义搜索均推迟。当前只保留稳定的 `capture:id` 和 Capture section，供未来 derived data 引用。
+- `Universal Capture/` 与 `Universal Capture/attachments/` 是 Raw Capture Layer，不是 Knowledge Graph。Obsidian Graph Filter 如需隐藏附件，使用 `-path:"Universal Capture/attachments"`；如需排除整个 Raw 层，使用 `-path:"Universal Capture"`。本项目不新增 Graph UI，也不自动修改 Obsidian 配置。
+
 旧版本已经产生的 `素材/Inbox`、`素材/attachments` 或旧 `Universal Capture` 内容不会被删除或自动迁移。
 
 ## 目录结构
@@ -114,7 +120,7 @@ flutter build windows
 
 - Windows runner 首次 `flutter build windows` 结果
 - Windows 文字、PNG/JPEG、bitmap、Explorer 文件和窗口交互真机测试
-- macOS 与 Windows 中 Obsidian 图片/PDF/视频 embed 的真实显示
+- macOS 与 Windows 中 Obsidian 图片 embed、普通文件链接的真实显示
 - macOS App Sandbox 仍为关闭状态；安装包、签名和分发不在本轮范围
 
 真实完成状态和最新验证记录见 [`PROJECT_STATE.md`](PROJECT_STATE.md)。

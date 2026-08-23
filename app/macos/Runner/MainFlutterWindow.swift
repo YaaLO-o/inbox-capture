@@ -35,8 +35,7 @@ class MainFlutterWindow: NSWindow {
     self.hasShadow = true
 
     // 让 Flutter 视图透明，胶囊圆角外不显示方形底色；引导页自身绘制不透明背景。
-    flutterViewController.view.wantsLayer = true
-    flutterViewController.view.layer?.backgroundColor = NSColor.clear.cgColor
+    flutterViewController.backgroundColor = .clear
 
     // 初始内容尺寸必须在 Flutter 首帧前与将呈现的视图匹配：
     // 未配置有效 Vault → 引导页 420x300；否则胶囊 132x132。

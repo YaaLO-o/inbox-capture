@@ -16,6 +16,7 @@ void main() {
     required Future<CaptureResult> Function() onCapture,
     bool disableAnimations = false,
     TargetPlatform platform = TargetPlatform.macOS,
+    VoidCallback? onQuit,
     ValueChanged<Offset>? onSecondaryTap,
   }) async {
     final image = (await tester.runAsync(
@@ -31,12 +32,98 @@ void main() {
             atlas: image,
             onCapture: onCapture,
             onMove: (_) {},
+            onQuit: onQuit ?? () {},
             onSecondaryTap: onSecondaryTap ?? (_) {},
           ),
         ),
       ),
     );
   }
+
+  Future<TestGesture> hoverPet(WidgetTester tester) async {
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: const Offset(1, 1));
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(
+      tester.getCenter(find.byKey(const Key('pet-visible-region'))),
+    );
+    await tester.pump();
+    return mouse;
+  }
+
+  testWidgets('quit button is absent and cannot be tapped before hover', (
+    tester,
+  ) async {
+    var captures = 0;
+    var quits = 0;
+    await pumpPet(
+      tester,
+      onCapture: () async {
+        captures += 1;
+        return const CaptureResult(CaptureStatus.saved);
+      },
+      onQuit: () => quits += 1,
+    );
+
+    expect(find.bySemanticsLabel('退出 INbox'), findsNothing);
+    final spriteTopLeft = tester.getTopLeft(find.byType(PixelChestSprite));
+    await tester.tapAt(spriteTopLeft + const Offset(86, 26));
+    await tester.pump();
+
+    expect(quits, 0);
+    expect(captures, 0);
+  });
+
+  testWidgets('hovering the pet shows an accessible quit button', (
+    tester,
+  ) async {
+    await pumpPet(
+      tester,
+      onCapture: () async => const CaptureResult(CaptureStatus.saved),
+    );
+
+    await hoverPet(tester);
+
+    final quitButton = find.bySemanticsLabel('退出 INbox');
+    expect(quitButton, findsOneWidget);
+    final hitTarget = tester.getSize(find.byKey(const Key('pet-quit-button')));
+    expect(hitTarget.width, greaterThanOrEqualTo(20));
+    expect(hitTarget.height, greaterThanOrEqualTo(20));
+  });
+
+  testWidgets('quit button calls quit once without capturing', (tester) async {
+    var captures = 0;
+    var quits = 0;
+    await pumpPet(
+      tester,
+      onCapture: () async {
+        captures += 1;
+        return const CaptureResult(CaptureStatus.saved);
+      },
+      onQuit: () => quits += 1,
+    );
+    await hoverPet(tester);
+
+    await tester.tap(find.bySemanticsLabel('退出 INbox'));
+    await tester.pump();
+
+    expect(quits, 1);
+    expect(captures, 0);
+  });
+
+  testWidgets('moving away removes the quit button', (tester) async {
+    await pumpPet(
+      tester,
+      onCapture: () async => const CaptureResult(CaptureStatus.saved),
+    );
+    final mouse = await hoverPet(tester);
+    expect(find.bySemanticsLabel('退出 INbox'), findsOneWidget);
+
+    await mouse.moveTo(const Offset(1, 1));
+    await tester.pump();
+
+    expect(find.bySemanticsLabel('退出 INbox'), findsNothing);
+  });
 
   testWidgets('fast success still completes the capture intro first', (
     tester,
@@ -294,6 +381,7 @@ void main() {
             return const CaptureResult(CaptureStatus.saved);
           },
           onMove: moves.add,
+          onQuit: () {},
           onSecondaryTap: (_) {},
         ),
       ),
@@ -325,6 +413,7 @@ void main() {
             return const CaptureResult(CaptureStatus.saved);
           },
           onMove: (_) {},
+          onQuit: () {},
           onSecondaryTap: (position) => menuPosition = position,
         ),
       ),

@@ -154,27 +154,130 @@ void main() {
     expect(md, contains('![[attachments/$fileName]]'));
   });
 
-  test('Finder 复制的本地文件：复制进 attachments 并嵌入', () async {
-    final now = DateTime(2026, 8, 21, 18, 4, 12);
-    final src = File('${tmp.path}/source.mp4')
-      ..writeAsBytesSync(Uint8List.fromList([1, 2, 3, 4]));
+  test('Finder 文件按类型落盘，并以普通链接保留安全显示名', () async {
+    final base = DateTime(2026, 8, 21, 18, 4, 12);
+    final sources =
+        <({String name, String extension, String displayName, bool isImage})>[
+          (
+            name: '合同]|终版.pdf',
+            extension: 'pdf',
+            displayName: '合同终版.pdf',
+            isImage: false,
+          ),
+          (
+            name: '演示.mp4',
+            extension: 'mp4',
+            displayName: '演示.mp4',
+            isImage: false,
+          ),
+          (
+            name: '产品演示.MOV',
+            extension: 'mov',
+            displayName: '产品演示.MOV',
+            isImage: false,
+          ),
+          (
+            name: '报价单.docx',
+            extension: 'docx',
+            displayName: '报价单.docx',
+            isImage: false,
+          ),
+          (
+            name: '资料包.zip',
+            extension: 'zip',
+            displayName: '资料包.zip',
+            isImage: false,
+          ),
+          (
+            name: '说明.unknown',
+            extension: 'unknown',
+            displayName: '说明.unknown',
+            isImage: false,
+          ),
+          (
+            name: '图片.PNG',
+            extension: 'png',
+            displayName: '图片.PNG',
+            isImage: true,
+          ),
+          (
+            name: '矢量图.svg',
+            extension: 'svg',
+            displayName: '矢量图.svg',
+            isImage: true,
+          ),
+          (
+            name: '相机原图.heic',
+            extension: 'heic',
+            displayName: '相机原图.heic',
+            isImage: false,
+          ),
+        ];
+    final svc = CaptureService(
+      clipboard: FakeClipboard(const ClipboardContent()),
+      storage: storage,
+    );
+
+    for (var i = 0; i < sources.length; i++) {
+      final source = sources[i];
+      final src = File('${tmp.path}/${source.name}')
+        ..writeAsBytesSync(Uint8List.fromList([i, i + 1]));
+      final now = base.add(Duration(seconds: i));
+      (svc.clipboard as FakeClipboard).content = ClipboardContent(
+        text: '附件 ${i + 1}',
+        files: [src.path],
+      );
+
+      final result = await svc.captureNow(tmp.path, now: now);
+
+      expect(result.isSaved, isTrue);
+      final fileName = '${result.captureId}.${source.extension}';
+      final copied = File('${VaultPaths.attachmentsDir(tmp.path)}/$fileName');
+      expect(copied.readAsBytesSync(), [i, i + 1]);
+
+      final md = readInbox(tmp.path, now);
+      final entry = source.isImage
+          ? '![[attachments/$fileName]]'
+          : '[[attachments/$fileName|${source.displayName}]]';
+      expect(md, contains(entry));
+      if (!source.isImage) {
+        expect(md, isNot(contains('![[attachments/$fileName]]')));
+      }
+      expect(
+        md.indexOf('## ${VaultPaths.timeStamp(now)}'),
+        lessThan(md.indexOf('<!-- capture:id=${result.captureId} -->')),
+      );
+      expect(
+        md.indexOf('<!-- capture:id=${result.captureId} -->'),
+        lessThan(md.indexOf('附件 ${i + 1}')),
+      );
+      expect(md.indexOf('附件 ${i + 1}'), lessThan(md.indexOf(entry)));
+      expect(md.indexOf(entry), lessThan(md.indexOf('---', md.indexOf(entry))));
+      expect(src.existsSync(), isTrue); // 复制，不移动。
+    }
+  });
+
+  test('危险扩展名和换行显示名不会破坏 Wikilink 或 Capture 边界', () async {
+    final now = DateTime(2026, 8, 21, 18, 5, 30);
+    final src = File('${tmp.path}/报告\n---\n终版.bad#draft')
+      ..writeAsBytesSync([1, 2, 3]);
     final svc = CaptureService(
       clipboard: FakeClipboard(ClipboardContent(files: [src.path])),
       storage: storage,
     );
 
-    final r = await svc.captureNow(tmp.path, now: now);
-    expect(r.isSaved, isTrue);
+    final result = await svc.captureNow(tmp.path, now: now);
 
-    final md = readInbox(tmp.path, now);
+    expect(result.isSaved, isTrue);
+    final storedName = result.captureId!;
     expect(
-      md.contains(
-        RegExp(r'!\[\[attachments/20260821-180412-[0-9a-f]{4}\.mp4\]\]'),
-      ),
+      File('${VaultPaths.attachmentsDir(tmp.path)}/$storedName').existsSync(),
       isTrue,
     );
-    // 源文件仍在（是复制，不是移动）。
-    expect(src.existsSync(), isTrue);
+    final md = readInbox(tmp.path, now);
+    expect(md, contains('[[attachments/$storedName|报告 --- 终版.baddraft]]'));
+    expect(md, isNot(contains('attachments/$storedName.bad#draft')));
+    expect('---\n'.allMatches(md), hasLength(1));
   });
 
   test('本地文件优先于同一剪贴板对象的重复图片 bytes', () async {

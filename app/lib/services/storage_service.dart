@@ -52,9 +52,15 @@ class StorageService {
     }
 
     for (final a in capture.attachments) {
-      // 图片 / PDF / 视频统一使用 Obsidian embed 语法，由扩展名决定渲染方式。
       final ref = VaultPaths.embedRef(a.fileName);
-      buf.writeln('![[$ref]]');
+      final displayName = _safeDisplayName(a.displayName);
+      if (a.isImage) {
+        buf.writeln('![[$ref]]');
+      } else if (displayName != null) {
+        buf.writeln('[[$ref|$displayName]]');
+      } else {
+        buf.writeln('[[$ref]]');
+      }
       buf.writeln();
     }
 
@@ -62,6 +68,16 @@ class StorageService {
     buf.writeln();
 
     file.writeAsStringSync(buf.toString(), mode: FileMode.append, flush: true);
+  }
+
+  String? _safeDisplayName(String? displayName) {
+    if (displayName == null) return null;
+    final oneLine = displayName.replaceAll(RegExp(r'[\x00-\x1f\x7f]'), ' ');
+    final safe = oneLine
+        .replaceAll(RegExp(r'[#|^:%\[\]]'), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return safe.isEmpty ? null : safe;
   }
 
   /// 将字节写入 attachments 目录，文件名由调用方给定。

@@ -23,17 +23,28 @@ class Capture {
       (text == null || text!.trim().isEmpty) && attachments.isEmpty;
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'createdAt': createdAt.toIso8601String(),
-        if (text != null) 'text': text,
-        if (attachments.isNotEmpty)
-          'attachments': attachments.map((a) => a.toJson()).toList(),
-      };
+    'id': id,
+    'createdAt': createdAt.toIso8601String(),
+    if (text != null) 'text': text,
+    if (attachments.isNotEmpty)
+      'attachments': attachments.map((a) => a.toJson()).toList(),
+  };
 }
 
 /// 附件的最小描述。文件本体落在 Obsidian Vault 的 attachments 目录，
 /// 这里只记录它在 Vault 内的相对文件名与基础元信息。
 class Attachment {
+  static const _imageExtensions = {
+    'avif',
+    'bmp',
+    'gif',
+    'jpeg',
+    'jpg',
+    'png',
+    'svg',
+    'webp',
+  };
+
   final String id;
 
   /// 写入 attachments/ 后的文件名，例如 `20260821-103215-a82f.png`。
@@ -45,17 +56,25 @@ class Attachment {
   /// MIME 类型，仅作记录，可能为空。
   final String? mimeType;
 
+  /// Finder / Explorer 本地文件原始 basename，用于非图片链接的显示名。
+  final String? displayName;
+
   const Attachment({
     required this.id,
     required this.fileName,
     required this.originalExtension,
     this.mimeType,
+    this.displayName,
   });
 
+  bool get isImage =>
+      _imageExtensions.contains(originalExtension.toLowerCase());
+
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'fileName': fileName,
-        'originalExtension': originalExtension,
-        if (mimeType != null) 'mimeType': mimeType,
-      };
+    'id': id,
+    'fileName': fileName,
+    'originalExtension': originalExtension,
+    if (mimeType != null) 'mimeType': mimeType,
+    if (displayName != null) 'displayName': displayName,
+  };
 }

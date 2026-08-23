@@ -84,6 +84,7 @@ class _CapturePillState extends State<CapturePill> {
                 atlas: atlas,
                 onCapture: () => widget.capture.captureNow(widget.vaultPath),
                 onMove: (delta) => _settings.moveWindowBy(delta.dx, delta.dy),
+                onQuit: _settings.quit,
                 onSecondaryTap: (position) => _showMenu(menuContext, position),
               );
             },

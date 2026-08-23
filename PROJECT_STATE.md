@@ -12,7 +12,7 @@ Windows 原生代码已经实现，但当前开发机是 macOS，无法在本机
 
 当前只做 Capture：用户复制文字、图片或本地文件后点击悬浮入口，原始内容直接追加到 Obsidian Vault。
 
-不包含 AI 分类、摘要、标签、Understand、Organize、搜索、云同步、账号、后端、数据库、网络内容解析、下载、Android、iOS 或 Web。
+不包含 AI 分类、摘要、标签、embedding、语义搜索、Understand、Organize、云同步、账号、后端、数据库、网络内容解析、下载、Android、iOS 或 Web。
 
 ## 最终架构
 
@@ -75,7 +75,11 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
         └── <capture-id>.<extension>
 ```
 
-日记文件首行是日期标题。每条 Capture 包含时间、唯一 ID 注释、可选文字、附件 Obsidian embed 和分隔线。所有写入使用 append，不覆盖已有内容。
+日记文件首行是日期标题。每条 Capture 按“时间、唯一 ID 注释、可选文字、附件、分隔线”顺序写入。Obsidian 支持预览的图片附件使用 embed；PDF、视频、Office、ZIP 和其他普通文件使用普通链接，Finder/Explorer 文件链接显示安全处理后的原始 basename。所有写入使用 append，不覆盖已有内容。
+
+`capture:id` 保持稳定唯一，Capture section 保持可供未来 derived data 引用；AI 分类、标签、embedding 和语义搜索仍明确推迟。
+
+`Universal Capture/` 与 `Universal Capture/attachments/` 是 Raw Capture Layer，不是 Knowledge Graph。Obsidian Graph Filter 要隐藏附件时使用 `-path:"Universal Capture/attachments"`；要排除整个 Raw 层时使用 `-path:"Universal Capture"`。当前不新增 Graph UI，也不自动修改 Obsidian 配置。
 
 历史 `素材/Inbox`、`素材/attachments` 和旧 Electron 内容不会被自动迁移或删除。
 
@@ -85,7 +89,7 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 
 - 文字、图片、本地文件 Capture
 - 唯一 Capture ID 和每日 Markdown
-- 附件普通文件存储与 Obsidian embed
+- 附件普通文件存储；图片 Obsidian embed、非图片普通链接
 - 连续 append、不覆盖
 - 500ms 快速点击防重
 - 失效 Vault 路径清理，验证过程不创建旧目录
@@ -163,7 +167,7 @@ flutter build windows
 
 - 必须在 Windows runner 或 Windows 真机首次编译 C++ Runner。
 - 必须真机测试 Windows 文字、PNG/JPEG、bitmap、Explorer 文件、目录选择、重启恢复、拖动、右键菜单与退出。
-- 需要在真实 Obsidian 中验证图片、PDF 和视频 embed 显示。
+- 需要在真实 Obsidian 中验证图片 embed 与普通文件链接显示。
 - macOS App Sandbox 仍关闭；重新启用需要 security-scoped bookmark。
 - 安装包、代码签名、公证、开机启动和发布流程不在当前范围。
 

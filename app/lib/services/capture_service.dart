@@ -53,9 +53,11 @@ class CaptureService {
 
       // 1) 图片：写入 attachments，保留原始扩展名；只有原始 bitmap 时落为 PNG。
       if (content.files.isEmpty && content.imageBytes != null) {
-        final ext = content.imageExtension.isEmpty
+        final rawExtension = content.imageExtension.isEmpty
             ? 'png'
             : content.imageExtension;
+        final sanitizedExtension = _safeExtension(rawExtension);
+        final ext = sanitizedExtension.isEmpty ? 'png' : sanitizedExtension;
         final fileName = '$id.$ext';
         storage.writeAttachmentBytes(vaultPath, fileName, content.imageBytes!);
         attachments.add(
@@ -71,7 +73,7 @@ class CaptureService {
       // 2) Finder / Explorer 复制的本地文件：复制进 attachments。
       for (var i = 0; i < content.files.length; i++) {
         final src = content.files[i];
-        final ext = _extensionOf(src);
+        final ext = _safeExtension(_extensionOf(src));
         // 多个文件时用同一 id + 序号，保证唯一。
         final suffix = content.files.length > 1 ? '-$i' : '';
         final baseName = '$id$suffix${ext.isEmpty ? '' : '.$ext'}';
@@ -82,6 +84,7 @@ class CaptureService {
               id: '$id$suffix',
               fileName: baseName,
               originalExtension: ext,
+              displayName: _baseNameOf(src),
             ),
           );
         } on FileSystemException catch (e) {
@@ -115,9 +118,16 @@ class CaptureService {
   }
 
   String _extensionOf(String path) {
-    final fileName = path.replaceAll('\\', '/').split('/').last;
+    final fileName = _baseNameOf(path);
     final dot = fileName.lastIndexOf('.');
     if (dot <= 0 || dot == fileName.length - 1) return '';
     return fileName.substring(dot + 1).toLowerCase();
   }
+
+  String _safeExtension(String extension) {
+    final normalized = extension.toLowerCase();
+    return RegExp(r'^[a-z0-9]+$').hasMatch(normalized) ? normalized : '';
+  }
+
+  String _baseNameOf(String path) => path.replaceAll('\\', '/').split('/').last;
 }
