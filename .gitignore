@@ -16,6 +16,9 @@ app/pubspec.lock.bak
 app/coverage/
 app/.widget_preview/
 
+# 发布产物（DMG 等），通过 GitHub Releases 分发，不提交进仓库
+dist/
+
 # IDE
 *.iml
 .idea/

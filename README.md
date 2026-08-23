@@ -1,27 +1,61 @@
-# INbox / Universal Capture
+![INbox](https://socialify.git.ci/YaaLO-o/inbox-capture/image?description=1&font=Source+Code+Pro&forks=1&issues=1&logo=https%3A%2F%2Fraw.githubusercontent.com%2FYaaLO-o%2Finbox-capture%2Fmain%2Fapp%2Fmacos%2FRunner%2FAssets.xcassets%2FAppIcon.appiconset%2Fapp_icon_1024.png&name=1&owner=1&pattern=Floating+Cogs&pulls=1&stargazers=1&theme=Auto)
 
-INbox 是一个本地优先的桌面采集工具。复制文字、图片或本地文件后，点击桌面悬浮入口，内容会作为普通 Markdown 和附件追加到用户选择的 Obsidian Vault。
+<div align="center">
 
-`app/` 下的 Flutter 工程是唯一正式客户端，同一套 Dart 产品与数据层面向 macOS 和 Windows。项目不使用数据库，不上传内容，也不在后台监听剪贴板。
+**把任何平台看到的文字、图片和文件，一键收进你的 Obsidian。**
 
-## 当前平台状态
+一个本地优先、不上传、不监听剪贴板的桌面采集 Inbox。
 
-- macOS：Flutter + Swift/AppKit，V0.1 已在本机完成分析、测试、Release 构建、Applications 安装和独立启动验证；桌面入口为像素宝箱怪桌宠。
-- Windows：同一 Flutter 工程 + C++/Win32 Runner，已实现原生适配器；仓库包含 Windows GitHub Actions 构建检查，仍需 Windows runner 或真机完成首次编译与交互验证。
-- Android、iOS、Web：不在当前范围。
+<div>
+    <a href="https://github.com/YaaLO-o/inbox-capture/releases/latest"><img alt="macOS" src="https://img.shields.io/badge/-macOS%20Universal-black?style=flat-square&logo=apple&logoColor=white" /></a>
+    <a href="https://github.com/YaaLO-o/inbox-capture/releases"><img alt="Windows (待验证)" src="https://img.shields.io/badge/-Windows%20%E5%BE%85%E9%AA%8C%E8%AF%81-blue?style=flat-square&logo=windows&logoColor=white" /></a>
+</div>
+
+<p>
+    <a href="https://github.com/YaaLO-o/inbox-capture/releases/latest"><img alt="Latest Release" src="https://img.shields.io/github/v/release/YaaLO-o/inbox-capture?style=flat-square" /></a>
+    <a href="https://github.com/YaaLO-o/inbox-capture/blob/main/LICENSE"><img alt="License" src="https://img.shields.io/github/license/YaaLO-o/inbox-capture?style=flat-square" /></a>
+    <a href="https://github.com/YaaLO-o/inbox-capture/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/YaaLO-o/inbox-capture/total?style=flat-square" /></a>
+    <a href="https://docs.flutter.dev/release/archive"><img alt="Flutter 3.47" src="https://img.shields.io/badge/Flutter-3.47-02569B?style=flat-square&logo=flutter&logoColor=white" /></a>
+</p>
+
+</div>
+
+![像素宝箱怪桌宠：待机 → 采集 → 成功](docs/assets/pet-hero.png)
+
+## 下载
+
+当前提供 **macOS（Apple Silicon + Intel，Universal）** 版本：
+
+👉 **[在 Releases 下载最新版 INbox](https://github.com/YaaLO-o/inbox-capture/releases/latest)**
+
+下载 `.dmg`，双击打开，把 `INbox` 拖入「应用程序 / Applications」即完成安装。
+
+> 首次打开若提示「无法验证开发者」或「已损坏」，请**右键 → 打开**，或参阅 [安装指南](.github/DOWNLOAD.md)。这是因为当前版本尚未购买 Apple Developer ID 进行签名和公证，应用本身完全本地运行、不联网。
+
+## 它是什么
+
+INbox 解决的问题很简单：在微博、小红书、抖音、网页、购物平台看到一本书、一部电影、一个观点或一张图时，不想分散收藏在各个平台里，而是用最低摩擦的动作直接存进自己的 Obsidian。
+
+核心动作：
+
+```text
+复制内容 → 点击桌宠 → 写入 Obsidian → 宝箱怪开心地收下
+```
+
+- **本地优先**：内容直接写进你自己选择的 Obsidian Vault，纯 Markdown + 附件文件，可直接阅读、搜索、迁移。
+- **Obsidian 是唯一存储层**：不使用数据库，不建账号，不上传内容，不请求网络。
+- **不监听剪贴板**：只有你点击桌宠的那一刻才会读取一次剪贴板。
+- **像素宝箱怪桌宠**：一个置顶、可拖拽的小入口；点击采集，带开箱动画反馈，右键切换 Vault / 退出。
 
 ## 功能
 
-- 文字、图片和 Finder/Explorer 本地文件 Capture
-- 每条 Capture 的唯一 ID
-- 每日 Markdown 只追加、不覆盖
-- 图片和本地文件作为普通附件保存，尽量保留原始格式
-- Finder/Explorer 文件优先，避免同一图片重复保存为文件和 bitmap
-- 失效 Vault 路径自动清理，不会在旧位置重新创建目录
-- 像素宝箱怪桌宠作为置顶悬浮入口，整个箱体可拖拽，点击 Capture，带保存状态动画
-- 右键重新选择 Vault 或退出
-
-Capture、路径、附件命名、Markdown 和 append 行为全部位于共享 Dart 层；平台原生代码只负责剪贴板、文件夹选择、设置持久化和窗口行为。
+- 文字、图片、Finder 本地文件采集
+- 每条记录有稳定、唯一的隐藏 `capture:id`，可供未来引用
+- 每天一个 Inbox Markdown，只追加、不覆盖
+- 图片在 Obsidian 中内嵌预览；PDF、视频、Office、ZIP 等以可点击链接保存
+- Finder/Explorer 文件优先，避免同一张图既存文件又存 bitmap
+- 失效 Vault 路径自动清理，不会在旧位置重建目录
+- 置顶悬浮桌宠，整个箱体可拖拽，保存状态有动画反馈
 
 ## Vault 数据结构
 
@@ -52,33 +86,32 @@ macOS 和 Windows 的新版本统一写入：
 
 ## Capture 与 Knowledge 决策
 
-- Obsidian 支持预览的图片附件使用 embed；PDF、视频、Office、ZIP 和其他普通文件使用普通链接。Finder/Explorer 文件的非图片链接会显示安全处理后的原始 basename；普通剪贴板图片没有原始名，因此不生成 alias。
-- AI 分类、标签、embedding 和语义搜索均推迟。当前只保留稳定的 `capture:id` 和 Capture section，供未来 derived data 引用。
-- `Universal Capture/` 与 `Universal Capture/attachments/` 是 Raw Capture Layer，不是 Knowledge Graph。Obsidian Graph Filter 如需隐藏附件，使用 `-path:"Universal Capture/attachments"`；如需排除整个 Raw 层，使用 `-path:"Universal Capture"`。本项目不新增 Graph UI，也不自动修改 Obsidian 配置。
+- Obsidian 支持预览的图片附件用 embed；PDF、视频、Office、ZIP 等用普通链接。Finder 文件的非图片链接会显示安全处理后的原始文件名；普通剪贴板图片没有原始名，因此不生成 alias。
+- AI 分类、标签、摘要、embedding、语义搜索均**推迟**。当前只保留稳定的 `capture:id` 和 Capture section，供未来 derived data 引用。
+- `Universal Capture/` 与 `Universal Capture/attachments/` 是 **Raw Capture Layer，不是 Knowledge Graph**。需要在 Obsidian Graph 中隐藏附件时用 `-path:"Universal Capture/attachments"`；排除整个 Raw 层用 `-path:"Universal Capture"`。本项目不新增 Graph UI，也不自动修改 Obsidian 配置。
 
-旧版本已经产生的 `素材/Inbox`、`素材/attachments` 或旧 `Universal Capture` 内容不会被删除或自动迁移。
+旧版本产生的 `素材/Inbox`、`素材/attachments` 或旧 `Universal Capture` 内容不会被删除或自动迁移。
 
 ## 目录结构
 
 ```text
 INbox/
 ├── app/                         # 唯一正式 Flutter 客户端
-│   ├── lib/                     # 共享模型、服务、路径与 UI
+│   ├── lib/                     # 共享模型、服务、路径与 UI（含像素宝箱怪桌宠）
 │   ├── macos/                   # Swift/AppKit adapter
 │   ├── windows/                 # C++/Win32 adapter
-│   └── test/                    # 共享 Dart/Widget 测试
+│   └── test/                    # 共享 Dart/Widget 测试（63 项）
+├── scripts/                     # install_macos.sh / release_macos.sh
 ├── legacy/
 │   └── electron-windows/        # 旧 Electron 参考实现，不再进入主线
-├── docs/superpowers/            # 当前架构设计和实施计划
+├── docs/superpowers/            # 架构设计与实施计划
 ├── README.md
 └── PROJECT_STATE.md
 ```
 
-## macOS 运行
+## 从源码构建
 
-前置环境：Flutter 3.47.1、Dart 3.13.1、Xcode。当前工程使用 Swift Package Manager，不依赖 CocoaPods。
-
-开发启动：
+前置环境：Flutter 3.47.1、Dart 3.13.1、Xcode。工程使用 Swift Package Manager，不依赖 CocoaPods。
 
 ```bash
 cd app
@@ -86,59 +119,43 @@ flutter pub get
 flutter run -d macos
 ```
 
-本机正式使用：
-
-```text
-/Applications/INbox.app
-```
-
-可以在「应用程序 / Applications」中双击 `INbox`，或通过 Spotlight 搜索 `INbox` 直接启动，不需要终端或 `flutter run`。
-
-代码更新后，在仓库根目录重新构建并安装：
-
-```bash
-./scripts/install_macos.sh
-```
-
-脚本会执行 `flutter pub get` 和 macOS Release 构建，然后使用 `ditto` 将产物安装到 `/Applications/INbox.app`。安装成功后，脚本会将 build 目录中的同名应用产物改为 `.noindex`，避免 Spotlight 出现多个 INbox；后续构建会正常重新生成产物。如果当前用户无权写入 `/Applications`，脚本会输出 Release 产物路径供手动拖入，不会调用 `sudo`。
-
-开发验证：
+验证：
 
 ```bash
 dart analyze lib test
 flutter test
-flutter build macos --debug
+flutter build macos --release
 ```
 
-## Windows 运行
+一键构建 Release 并打包成可分发 DMG：
 
-前置环境：Flutter 3.47.1、Visual Studio 2022，并安装“使用 C++ 的桌面开发”工作负载。
-
-```powershell
-cd app
-flutter pub get
-flutter run -d windows
+```bash
+sh scripts/release_macos.sh 0.1.0
+# 产物：dist/INbox-0.1.0-macos-universal.dmg
 ```
 
-构建验证：
+日常本机使用可在仓库根目录运行 `./scripts/install_macos.sh`，它会构建 Release 并安装到 `/Applications/INbox.app`。
 
-```powershell
-dart analyze lib test
-flutter test
-flutter build windows
-```
+## 当前状态与限制
 
-`.github/workflows/windows-build.yml` 会在 Windows runner 上执行相同的最小构建检查。
+- ✅ **macOS V0.1 完成**：`dart analyze` 无问题、63/63 测试通过、Release 构建为 Universal `INbox.app`，已验证可安装启动。
+- 🟡 **Windows**：同一套 Flutter + C++/Win32 代码已完成，仓库含 GitHub Actions 构建检查，但尚未在 Windows 真机首次编译与交互验证，暂不提供下载。
+- 🔒 macOS App Sandbox 当前关闭（重新启用需要 security-scoped bookmark）。
+- 🚫 暂未做 Apple Developer ID 签名 / 公证、DMG/PKG 分发流程，因此首次打开需按 [安装指南](.github/DOWNLOAD.md) 放行。
+- 🤖 AI 分类、标签、摘要、语义搜索、Knowledge Layer、云同步均在后续版本规划中，V0.1 只做 Capture。
 
-## Legacy Electron
+真实完成状态与验证记录见 [PROJECT_STATE.md](PROJECT_STATE.md)。
 
-原 Windows Electron 客户端完整保留在 `legacy/electron-windows/`，用于追溯旧悬浮入口体验和历史行为。它不再是正式入口，也不应继续承载新功能。
+## 历史星标
 
-## 当前仍需人工验证
+<a href="https://www.star-history.com/#YaaLO-o/inbox-capture&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=YaaLO-o/inbox-capture&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=YaaLO-o/inbox-capture&type=Date" />
+   <img alt="Star History" src="https://api.star-history.com/svg?repos=YaaLO-o/inbox-capture&type=Date" />
+ </picture>
+</a>
 
-- Windows runner 首次 `flutter build windows` 结果
-- Windows 文字、PNG/JPEG、bitmap、Explorer 文件和窗口交互真机测试
-- macOS 与 Windows 中 Obsidian 图片 embed、普通文件链接的真实显示
-- macOS App Sandbox 仍为关闭状态；安装包、签名和分发不在本轮范围
+## License
 
-真实完成状态和最新验证记录见 [`PROJECT_STATE.md`](PROJECT_STATE.md)。
+本项目采用 [MIT License](LICENSE)。
