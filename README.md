@@ -24,17 +24,29 @@
 
 ## 下载
 
-当前提供 **macOS（Apple Silicon + Intel，Universal）** 版本：
+当前提供 **macOS（Apple Silicon + Intel，Universal）** 版本。
+
+### 方式一：终端一键安装（推荐，无安全提示）
+
+复制下面这行到「终端」回车即可，脚本会自动下载并安装到 `/Applications`：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/YaaLO-o/inbox-capture/main/scripts/install.sh | sh
+```
+
+用这种方式安装，App **不会被 macOS Gatekeeper 拦截**——原理和 Homebrew 的 `brew install --no-quarantine` 一样：`curl` 下载的文件不携带浏览器添加的隔离标记，配合 `ditto` 安装，首次打开即可直接运行。
+
+### 方式二：手动下载 DMG
 
 <h3 align="center">
   <a href="https://github.com/YaaLO-o/inbox-capture/releases/latest/download/INbox-macos-universal.dmg"><b>⬇ 下载 INbox for macOS（Universal DMG）</b></a>
 </h3>
 
-点击上方按钮直接开始下载最新版 `.dmg`，双击打开，把 `INbox` 拖入「应用程序 / Applications」即完成安装。
+点击按钮直接下载 `.dmg`，双击打开，把 `INbox` 拖入「应用程序 / Applications」即完成安装。
+
+> 通过浏览器下载后首次打开若提示「无法验证开发者」或「已损坏」，请**右键 → 打开**，或在「系统设置 → 隐私与安全性」点「仍要打开」。这是因为当前版本尚未购买 Apple Developer ID 签名和公证（应用完全本地运行、不联网）；用上面的**方式一安装则不会出现该提示**。完整说明见 [安装指南](.github/DOWNLOAD.md)。
 
 > 想看更新日志、历史版本或校验值，请前往 [Releases 页面](https://github.com/YaaLO-o/inbox-capture/releases/latest)。
-
-> 首次打开若提示「无法验证开发者」或「已损坏」，请**右键 → 打开**，或参阅 [安装指南](.github/DOWNLOAD.md)。这是因为当前版本尚未购买 Apple Developer ID 进行签名和公证，应用本身完全本地运行、不联网。
 
 ## 它是什么
 

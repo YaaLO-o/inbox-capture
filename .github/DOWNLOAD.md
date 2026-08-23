@@ -2,11 +2,21 @@
 
 ## macOS
 
-### 1. 下载
-
-在 [Releases](https://github.com/YaaLO-o/inbox-capture/releases/latest) 下载最新的 `INbox-<版本>-macos-universal.dmg`。
-
 文件同时支持 **Apple Silicon（M 系列）和 Intel** 芯片。
+
+### 方式一：终端一键安装（推荐，无安全提示）
+
+复制下面这行到「终端」回车：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/YaaLO-o/inbox-capture/main/scripts/install.sh | sh
+```
+
+脚本会自动下载最新版、安装到 `/Applications` 并启动。用这种方式安装**不会出现「无法验证开发者」的提示**——因为 `curl` 下载的文件不会被浏览器附加 macOS 隔离标记，和 Homebrew 的 `brew install --no-quarantine` 原理相同。
+
+### 方式二：手动下载 DMG
+
+在 [Releases](https://github.com/YaaLO-o/inbox-capture/releases/latest) 下载最新的 `INbox-<版本>-macos-universal.dmg`（或点 README 里的下载按钮）。
 
 ### 2. 安装
 
