@@ -89,7 +89,11 @@ void main() {
     expect(r.captureId, startsWith('20260821-103215-'));
 
     final md = readInbox(tmp.path, now);
-    expect(md.startsWith('# 2026-08-21\n'), isTrue);
+    expect(
+      md.startsWith('## 10:32:15\n\n<!-- capture:id=${r.captureId} -->\n'),
+      isTrue,
+    );
+    expect(md, isNot(startsWith('# 2026-08-21\n')));
     expect(md, contains('## 10:32:15'));
     expect(md, contains('<!-- capture:id=${r.captureId} -->'));
     expect(md, contains('一段笔记内容')); // trim 生效
@@ -115,8 +119,8 @@ void main() {
     expect(ids.length, 10);
 
     final md = readInbox(tmp.path, base);
-    // 标题只出现一次（不覆盖、不重复写标题）。
-    expect('# 2026-08-21\n'.allMatches(md).length, 1);
+    // 日期只由文件名表达，正文不重复日期标题。
+    expect('# 2026-08-21\n'.allMatches(md), isEmpty);
     // 边界数量等于条目数。
     expect('---\n'.allMatches(md).length, 10);
     // 顺序正确。

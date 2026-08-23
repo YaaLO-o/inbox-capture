@@ -12,7 +12,6 @@ class PixelChestPet extends StatefulWidget {
   final ui.Image atlas;
   final Future<CaptureResult> Function() onCapture;
   final ValueChanged<Offset> onMove;
-  final VoidCallback onQuit;
   final ValueChanged<Offset> onSecondaryTap;
 
   const PixelChestPet({
@@ -20,7 +19,6 @@ class PixelChestPet extends StatefulWidget {
     required this.atlas,
     required this.onCapture,
     required this.onMove,
-    required this.onQuit,
     required this.onSecondaryTap,
   });
 
@@ -35,7 +33,6 @@ class _PixelChestPetState extends State<PixelChestPet>
   PetFrameSequence _sequence = PixelChestAtlas.idle;
   int _frameIndex = PixelChestAtlas.idle.frames.first;
   bool _waiting = false;
-  bool _hovering = false;
   String? _feedback;
   bool _feedbackVisible = false;
   Timer? _feedbackTimer;
@@ -287,91 +284,51 @@ class _PixelChestPetState extends State<PixelChestPet>
         children: [
           SizedBox.square(
             dimension: PixelChestAtlas.displaySize,
-            child: MouseRegion(
-              onEnter: (_) => setState(() => _hovering = true),
-              onExit: (_) => setState(() => _hovering = false),
-              child: Stack(
-                children: [
-                  PixelChestSprite(
-                    image: widget.atlas,
-                    frameIndex: _frameIndex,
-                  ),
-                  Positioned(
-                    left: PixelChestAtlas.bodyLeft,
-                    top: PixelChestAtlas.bodyTop,
-                    width: PixelChestAtlas.bodyWidth,
-                    height: PixelChestAtlas.bodyHeight,
-                    child: GestureDetector(
-                      key: const Key('pet-visible-region'),
-                      behavior: HitTestBehavior.opaque,
-                      onSecondaryTapUp: (details) =>
-                          widget.onSecondaryTap(details.globalPosition),
-                      child: Stack(
-                        children: [
-                          Positioned(
-                            top: PixelChestAtlas.dragHeight,
-                            width: PixelChestAtlas.bodyWidth,
-                            height:
-                                PixelChestAtlas.bodyHeight -
-                                PixelChestAtlas.dragHeight,
-                            child: Semantics(
-                              button: true,
-                              label: '保存到 INbox',
-                              child: GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: _capture,
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            width: PixelChestAtlas.bodyWidth,
-                            height: PixelChestAtlas.dragHeight,
+            child: Stack(
+              children: [
+                PixelChestSprite(image: widget.atlas, frameIndex: _frameIndex),
+                Positioned(
+                  left: PixelChestAtlas.bodyLeft,
+                  top: PixelChestAtlas.bodyTop,
+                  width: PixelChestAtlas.bodyWidth,
+                  height: PixelChestAtlas.bodyHeight,
+                  child: GestureDetector(
+                    key: const Key('pet-visible-region'),
+                    behavior: HitTestBehavior.opaque,
+                    onSecondaryTapUp: (details) =>
+                        widget.onSecondaryTap(details.globalPosition),
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          top: PixelChestAtlas.dragHeight,
+                          width: PixelChestAtlas.bodyWidth,
+                          height:
+                              PixelChestAtlas.bodyHeight -
+                              PixelChestAtlas.dragHeight,
+                          child: Semantics(
+                            button: true,
+                            label: '保存到 INbox',
                             child: GestureDetector(
-                              key: const Key('pet-drag-handle'),
                               behavior: HitTestBehavior.opaque,
-                              onPanUpdate: (details) =>
-                                  widget.onMove(details.delta),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (_hovering)
-                    Positioned(
-                      right: 0,
-                      top: 16,
-                      width: 20,
-                      height: 20,
-                      child: Semantics(
-                        button: true,
-                        label: '退出 INbox',
-                        child: GestureDetector(
-                          key: const Key('pet-quit-button'),
-                          behavior: HitTestBehavior.opaque,
-                          onTap: widget.onQuit,
-                          child: Center(
-                            child: SizedBox.square(
-                              dimension: 16,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: PixelChestAtlas.paper,
-                                  border: Border.all(
-                                    color: PixelChestAtlas.outline,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: const CustomPaint(
-                                  painter: _PixelClosePainter(),
-                                ),
-                              ),
+                              onTap: _capture,
                             ),
                           ),
                         ),
-                      ),
+                        Positioned(
+                          width: PixelChestAtlas.bodyWidth,
+                          height: PixelChestAtlas.dragHeight,
+                          child: GestureDetector(
+                            key: const Key('pet-drag-handle'),
+                            behavior: HitTestBehavior.opaque,
+                            onPanUpdate: (details) =>
+                                widget.onMove(details.delta),
+                          ),
+                        ),
+                      ],
                     ),
-                ],
-              ),
+                  ),
+                ),
+              ],
             ),
           ),
           AnimatedOpacity(
@@ -412,23 +369,4 @@ class _PixelChestPetState extends State<PixelChestPet>
     _controller.dispose();
     super.dispose();
   }
-}
-
-class _PixelClosePainter extends CustomPainter {
-  const _PixelClosePainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = PixelChestAtlas.outline
-      ..isAntiAlias = false;
-    for (var i = 0; i < 5; i += 1) {
-      final offset = 1.0 + i * 2;
-      canvas.drawRect(Rect.fromLTWH(offset, offset, 2, 2), paint);
-      canvas.drawRect(Rect.fromLTWH(9 - i * 2, offset, 2, 2), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_PixelClosePainter oldDelegate) => false;
 }

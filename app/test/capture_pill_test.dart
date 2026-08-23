@@ -83,31 +83,6 @@ void main() {
     expect(capture.calls, 1);
   });
 
-  testWidgets('悬停退出按钮调用原有 quit 且不执行 Capture', (tester) async {
-    final calls = <MethodCall>[];
-    messenger.setMockMethodCallHandler(settingsChannel, (call) async {
-      calls.add(call);
-      return null;
-    });
-    final capture = FakeCaptureService(
-      const CaptureResult(CaptureStatus.saved),
-    );
-    await pumpPill(tester, capture: capture);
-    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
-    await mouse.addPointer(location: const Offset(1, 1));
-    addTearDown(mouse.removePointer);
-
-    await mouse.moveTo(
-      tester.getCenter(find.byKey(const Key('pet-visible-region'))),
-    );
-    await tester.pump();
-    await tester.tap(find.bySemanticsLabel('退出 INbox'));
-    await tester.pump();
-
-    expect(calls.map((call) => call.method), ['quit']);
-    expect(capture.calls, 0);
-  });
-
   testWidgets('拖动只通过共享设置通道移动原生窗口', (tester) async {
     final calls = <MethodCall>[];
     messenger.setMockMethodCallHandler(settingsChannel, (call) async {

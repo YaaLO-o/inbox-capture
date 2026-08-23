@@ -23,8 +23,8 @@ class StorageService {
 
   /// 将 Capture 追加写入当天的 Inbox Markdown 文件。
   ///
-  /// 文件不存在时创建，首行写入 `# YYYY-MM-DD`；存在时只在末尾追加，
-  /// 绝不动已有内容（见《方案》第五、三节）。同步写入，保证调用返回时已落盘。
+  /// 文件不存在时直接写入首条 Capture；存在时只在末尾追加，绝不动已有内容。
+  /// 日期由每日文件名表达，不在正文重复。同步写入，保证调用返回时已落盘。
   void appendCapture(String vaultPath, Capture capture) {
     ensureVaultLayout(vaultPath);
     final date = DateTime(
@@ -33,13 +33,7 @@ class StorageService {
       capture.createdAt.day,
     );
     final file = File(VaultPaths.dailyInboxFile(vaultPath, date));
-    final isNew = !file.existsSync();
     final buf = StringBuffer();
-
-    if (isNew) {
-      buf.writeln('# ${VaultPaths.dateStamp(date)}');
-      buf.writeln();
-    }
 
     buf.writeln('## ${VaultPaths.timeStamp(capture.createdAt)}');
     buf.writeln();
