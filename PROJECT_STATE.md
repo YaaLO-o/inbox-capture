@@ -1,10 +1,12 @@
 # Project State
 
-更新时间：2026-08-22
+更新时间：2026-08-23
 
 ## 当前阶段
 
-Flutter Desktop Capture 基础设施统一完成。`app/` 是唯一正式主工程，包含 macOS 和 Windows target；旧 Electron Windows 客户端已降级到 `legacy/electron-windows/`，只作为迁移参考。
+V0.1（Mac Capture MVP）已完成。`app/` 是唯一正式主工程，包含 macOS 和 Windows target；旧 Electron Windows 客户端已降级到 `legacy/electron-windows/`，只作为迁移参考。桌面入口已从悬浮胶囊改为像素宝箱怪桌宠。
+
+macOS Release App 已完成本机安装验证。正式应用名为 `INbox`，Bundle Identifier 保持 `com.inbox.inboxApp`，安装位置为 `/Applications/INbox.app`；可从 Applications 或 Spotlight 启动，运行后继续保持 LSUIElement 桌面悬浮助手模式。再次从 Applications 或 Spotlight 打开已运行的 INbox 时，AppDelegate 会重新显示悬浮窗。安装脚本会注销并归档 build 目录中的同名 `.app` 产物，避免开发产物污染 Spotlight 搜索结果。
 
 Windows 原生代码已经实现，但当前开发机是 macOS，无法在本机编译 Windows Runner。仓库已增加 Windows GitHub Actions build check；在该工作流或 Windows 真机成功前，Windows 状态是“代码完成、待 Windows 编译与交互验证”。
 
@@ -94,7 +96,7 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 - 500ms 快速点击防重
 - 失效 Vault 路径清理，验证过程不创建旧目录
 - 本地文件优先于同一剪贴板对象的 bitmap
-- 共享 `•••` 拖动把手、圆形“收”入口和状态反馈
+- 像素宝箱怪桌宠作为桌面入口：整个箱体可拖拽，点击触发 Capture，带 idle/capturing/success/empty/error 动画与 golden 测试
 - 右键重新选择 Vault、退出
 
 ### macOS adapter
@@ -119,35 +121,37 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 
 ## 自动化测试
 
-当前 Flutter 测试共 17 项，覆盖：
+当前 Flutter 测试共 63 项，覆盖：
 
 - 统一目录和 attachment 引用
 - macOS/Windows 标记输入生成相同 Markdown
-- Capture ID
-- 文字 trim、新文件格式
+- Capture ID（稳定、唯一、隐藏 HTML 注释）
+- 文字 trim、`HH:mm` 分钟级标题、新文件格式
 - 连续 10 条 append
-- 图片和本地文件
+- 图片 embed、PDF/视频/普通文件链接
 - 带点父目录中的无扩展名文件
 - 文件优先于重复 bitmap
-- 空剪贴板
-- 文字与图片混合
+- 空剪贴板与文字/图片混合
 - 有效和失效 Vault 配置
 - ClipboardService contract 归一化
-- 共享悬浮入口可见元素和拖动通道
-- 首次引导中的统一目录说明
+- 像素宝箱怪桌宠：动画 manifest、sprite 渲染、点击/拖拽/右键、success/empty/error、reduced-motion、golden
+- 窗口透明 surface 与首次引导中的统一目录说明
 
 旧 Electron 11 项 Node 测试仍保留在 legacy 目录并通过，但不再作为正式客户端验收项。
 
-## 本轮本机验证
+## V0.1 本机验证
 
 在 macOS 开发机完成：
 
 ```text
 flutter pub get                 通过
 dart analyze lib test           No issues found
-flutter test                    17/17 通过
-flutter build macos --debug     通过
-macOS debug executable launch   通过，进程稳定存活 3 秒
+flutter test                    63/63 通过
+flutter build macos --debug     通过，产物为 INbox.app
+flutter build macos --release   通过，产物为 INbox.app
+Applications install            通过，安装到 /Applications/INbox.app
+Applications independent launch 通过，进程从 /Applications/INbox.app 启动
+macOS floating pet UI           通过，像素宝箱怪桌宠实际可见
 ```
 
 ## Windows CI
@@ -169,17 +173,24 @@ flutter build windows
 - 必须真机测试 Windows 文字、PNG/JPEG、bitmap、Explorer 文件、目录选择、重启恢复、拖动、右键菜单与退出。
 - 需要在真实 Obsidian 中验证图片 embed 与普通文件链接显示。
 - macOS App Sandbox 仍关闭；重新启用需要 security-scoped bookmark。
-- 安装包、代码签名、公证、开机启动和发布流程不在当前范围。
+- DMG/PKG、Developer ID、公证、开机启动和公开发布流程不在当前范围。
 
 ## 运行方式
 
 macOS：
 
 ```bash
+# 开发启动
 cd app
 flutter pub get
 flutter run -d macos
+
+# 返回仓库根目录后，重新构建并安装本机 Release App
+cd ..
+./scripts/install_macos.sh
 ```
+
+日常使用时直接在 Applications 双击 `INbox`，或通过 Spotlight 搜索 `INbox`。正式安装路径是 `/Applications/INbox.app`。
 
 Windows：
 

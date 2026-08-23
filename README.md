@@ -6,7 +6,7 @@ INbox 是一个本地优先的桌面采集工具。复制文字、图片或本�
 
 ## 当前平台状态
 
-- macOS：Flutter + Swift/AppKit，已在本机完成分析、测试、构建和进程启动验证。
+- macOS：Flutter + Swift/AppKit，V0.1 已在本机完成分析、测试、Release 构建、Applications 安装和独立启动验证；桌面入口为像素宝箱怪桌宠。
 - Windows：同一 Flutter 工程 + C++/Win32 Runner，已实现原生适配器；仓库包含 Windows GitHub Actions 构建检查，仍需 Windows runner 或真机完成首次编译与交互验证。
 - Android、iOS、Web：不在当前范围。
 
@@ -18,7 +18,7 @@ INbox 是一个本地优先的桌面采集工具。复制文字、图片或本�
 - 图片和本地文件作为普通附件保存，尽量保留原始格式
 - Finder/Explorer 文件优先，避免同一图片重复保存为文件和 bitmap
 - 失效 Vault 路径自动清理，不会在旧位置重新创建目录
-- 置顶悬浮入口、拖动把手、保存状态提示
+- 像素宝箱怪桌宠作为置顶悬浮入口，整个箱体可拖拽，点击 Capture，带保存状态动画
 - 右键重新选择 Vault 或退出
 
 Capture、路径、附件命名、Markdown 和 append 行为全部位于共享 Dart 层；平台原生代码只负责剪贴板、文件夹选择、设置持久化和窗口行为。
@@ -78,13 +78,31 @@ INbox/
 
 前置环境：Flutter 3.47.1、Dart 3.13.1、Xcode。当前工程使用 Swift Package Manager，不依赖 CocoaPods。
 
+开发启动：
+
 ```bash
 cd app
 flutter pub get
 flutter run -d macos
 ```
 
-验证：
+本机正式使用：
+
+```text
+/Applications/INbox.app
+```
+
+可以在「应用程序 / Applications」中双击 `INbox`，或通过 Spotlight 搜索 `INbox` 直接启动，不需要终端或 `flutter run`。
+
+代码更新后，在仓库根目录重新构建并安装：
+
+```bash
+./scripts/install_macos.sh
+```
+
+脚本会执行 `flutter pub get` 和 macOS Release 构建，然后使用 `ditto` 将产物安装到 `/Applications/INbox.app`。安装成功后，脚本会将 build 目录中的同名应用产物改为 `.noindex`，避免 Spotlight 出现多个 INbox；后续构建会正常重新生成产物。如果当前用户无权写入 `/Applications`，脚本会输出 Release 产物路径供手动拖入，不会调用 `sudo`。
+
+开发验证：
 
 ```bash
 dart analyze lib test

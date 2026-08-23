@@ -21,7 +21,7 @@ class MainFlutterWindow: NSWindow {
   private func configureFloatingWindow(flutterViewController: FlutterViewController) {
     // 先配置窗口样式：fullSizeContentView 让 contentView 延伸到标题栏区域，
     // 这样 setContentSize 设置的尺寸与 Flutter 视图尺寸一致，不会被标题栏吃掉。
-    self.title = "Inbox"
+    self.title = "INbox"
     self.titleVisibility = .hidden
     self.titlebarAppearsTransparent = true
     self.styleMask.insert(.fullSizeContentView)
