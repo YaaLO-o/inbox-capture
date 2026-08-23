@@ -24,5 +24,13 @@ dist/
 .idea/
 .vscode/
 
+# AI 编码工具的本地配置（不进仓库）
+.codex/
+.claude/
+
+# Obsidian 机器相关状态（保留 vault 配置，忽略窗口布局）
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+
 # 本地采集产生的素材不应进入代码仓库（用户自己的 Obsidian 内容）
 素材/
