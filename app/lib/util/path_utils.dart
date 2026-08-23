@@ -29,8 +29,7 @@ class VaultPaths {
 
   static String timeStamp(DateTime t) =>
       '${t.hour.toString().padLeft(2, '0')}:'
-      '${t.minute.toString().padLeft(2, '0')}:'
-      '${t.second.toString().padLeft(2, '0')}';
+      '${t.minute.toString().padLeft(2, '0')}';
 
   static String _join(String a, String b, [String? c]) {
     final sep = Platform.isWindows ? '\\' : '/';

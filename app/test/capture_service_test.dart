@@ -90,11 +90,11 @@ void main() {
 
     final md = readInbox(tmp.path, now);
     expect(
-      md.startsWith('## 10:32:15\n\n<!-- capture:id=${r.captureId} -->\n'),
+      md.startsWith('## 10:32\n\n<!-- capture:id=${r.captureId} -->\n'),
       isTrue,
     );
     expect(md, isNot(startsWith('# 2026-08-21\n')));
-    expect(md, contains('## 10:32:15'));
+    expect(md, isNot(contains('## 10:32:15')));
     expect(md, contains('<!-- capture:id=${r.captureId} -->'));
     expect(md, contains('一段笔记内容')); // trim 生效
     expect(md, endsWith('---\n\n'));

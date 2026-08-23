@@ -75,7 +75,7 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
         └── <capture-id>.<extension>
 ```
 
-日期只由每日文件名表达，正文不再重复日期一级标题。每条 Capture 按“时间、唯一 ID 注释、可选文字、附件、分隔线”顺序写入。Obsidian 支持预览的图片附件使用 embed；PDF、视频、Office、ZIP 和其他普通文件使用普通链接，Finder/Explorer 文件链接显示安全处理后的原始 basename。所有写入使用 append，不覆盖已有内容。
+日期只由每日文件名表达，正文不再重复日期一级标题。每条 Capture 按“分钟级时间、唯一 ID 注释、可选文字、附件、分隔线”顺序写入；人类可见标题使用 `HH:mm`，机器使用的 Capture ID 和附件文件名仍保留秒数。Obsidian 支持预览的图片附件使用 embed；PDF、视频、Office、ZIP 和其他普通文件使用普通链接，Finder/Explorer 文件链接显示安全处理后的原始 basename。所有写入使用 append，不覆盖已有内容。
 
 `capture:id` 保持稳定唯一，Capture section 保持可供未来 derived data 引用；AI 分类、标签、embedding 和语义搜索仍明确推迟。
 
