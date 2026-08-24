@@ -3,6 +3,16 @@ import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate {
+  private var statusMenuController: StatusMenuController?
+
+  override func applicationDidFinishLaunching(_ notification: Notification) {
+    super.applicationDidFinishLaunching(notification)
+
+    statusMenuController = StatusMenuController { [weak self] action in
+      self?.handleStatusMenuAction(action)
+    }
+  }
+
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
     // 悬浮入口关闭不应直接退出应用；通过菜单或退出按钮结束。
     return false
@@ -21,6 +31,29 @@ class AppDelegate: FlutterAppDelegate {
 
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
     return true
+  }
+
+  private func handleStatusMenuAction(_ action: StatusMenuAction) {
+    switch action {
+    case .showWindow:
+      mainFlutterWindow?.makeKeyAndOrderFront(nil)
+      NSApp.activate(ignoringOtherApps: true)
+    case .checkForUpdates:
+      sendCommand("checkForUpdates")
+      mainFlutterWindow?.makeKeyAndOrderFront(nil)
+      NSApp.activate(ignoringOtherApps: true)
+    case .quit:
+      NSApp.terminate(nil)
+    }
+  }
+
+  private func sendCommand(_ method: String) {
+    guard let controller = mainFlutterWindow?.contentViewController as? FlutterViewController else { return }
+    let channel = FlutterMethodChannel(
+      name: "com.inbox.app/commands",
+      binaryMessenger: controller.engine.binaryMessenger
+    )
+    channel.invokeMethod(method, arguments: nil)
   }
 }
 

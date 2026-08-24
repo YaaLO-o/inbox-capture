@@ -38,10 +38,6 @@ class MainFlutterWindow: NSWindow {
     self.titlebarAppearsTransparent = true
     self.styleMask.insert(.fullSizeContentView)
     self.styleMask.remove(.resizable)
-    // 隐藏红黄绿三个窗口控制按钮（桌宠浮窗不需要，也避免菜单弹出时出现顶部圆点）
-    self.standardWindowButton(.closeButton)?.isHidden = true
-    self.standardWindowButton(.miniaturizeButton)?.isHidden = true
-    self.standardWindowButton(.zoomButton)?.isHidden = true
     self.isMovableByWindowBackground = false
     self.isReleasedWhenClosed = false
     self.level = .floating

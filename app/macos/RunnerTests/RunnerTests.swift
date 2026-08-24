@@ -16,4 +16,15 @@ class RunnerTests: XCTestCase {
       NSPoint(x: 155, y: 50)
     )
   }
+
+  func testStatusMenuDispatchesEverySupportedAction() {
+    var received: [StatusMenuAction] = []
+    let dispatcher = StatusMenuDispatcher { received.append($0) }
+
+    dispatcher.dispatch(.showWindow)
+    dispatcher.dispatch(.checkForUpdates)
+    dispatcher.dispatch(.quit)
+
+    XCTAssertEqual(received, [.showWindow, .checkForUpdates, .quit])
+  }
 }
