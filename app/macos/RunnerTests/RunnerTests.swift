@@ -59,4 +59,22 @@ class RunnerTests: XCTestCase {
 
     XCTAssertEqual(mountPoint.path, "/Volumes/INbox")
   }
+
+  func testHelperLaunchScrubsInheritedOpenOverride() {
+    let paths = UpdatePaths(installApp: URL(fileURLWithPath: "/Applications/INbox.app"), pid: 42)
+    let process = UpdateInstaller.configuredHelperProcess(
+      helperURL: URL(fileURLWithPath: "/tmp/replace_macos_app.sh"),
+      paths: paths,
+      oldPID: 42,
+      inheritedEnvironment: [
+        "INBOX_OPEN_COMMAND": "/tmp/fake-open",
+        "INBOX_FAKE_OPEN_LOG": "/tmp/open.log",
+        "PATH": "/tmp/poison",
+      ]
+    )
+
+    XCTAssertEqual(process.environment, ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"])
+    XCTAssertNil(process.environment?["INBOX_OPEN_COMMAND"])
+    XCTAssertNil(process.environment?["INBOX_FAKE_OPEN_LOG"])
+  }
 }

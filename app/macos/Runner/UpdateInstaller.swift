@@ -199,6 +199,26 @@ enum UpdateInstaller {
   }
 
   private static func launchHelper(helperURL: URL, paths: UpdatePaths, oldPID: pid_t) throws {
+    let process = configuredHelperProcess(
+      helperURL: helperURL,
+      paths: paths,
+      oldPID: oldPID,
+      inheritedEnvironment: ProcessInfo.processInfo.environment
+    )
+
+    do {
+      try process.run()
+    } catch {
+      throw UpdateInstallError.helperLaunchFailed("Could not launch update helper: \(error.localizedDescription)")
+    }
+  }
+
+  static func configuredHelperProcess(
+    helperURL: URL,
+    paths: UpdatePaths,
+    oldPID: pid_t,
+    inheritedEnvironment: [String: String]
+  ) -> Process {
     let process = Process()
     process.executableURL = helperURL
     process.arguments = [
@@ -208,12 +228,12 @@ enum UpdateInstaller {
       paths.backup.path,
       paths.log.path,
     ]
+    process.environment = helperEnvironment(inheritedEnvironment: inheritedEnvironment)
+    return process
+  }
 
-    do {
-      try process.run()
-    } catch {
-      throw UpdateInstallError.helperLaunchFailed("Could not launch update helper: \(error.localizedDescription)")
-    }
+  private static func helperEnvironment(inheritedEnvironment: [String: String]) -> [String: String] {
+    return ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
   }
 
   private static func removeGeneratedPathIfPresent(_ url: URL) throws {
