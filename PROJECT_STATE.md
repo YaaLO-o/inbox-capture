@@ -1,6 +1,6 @@
 # Project State
 
-更新时间：2026-08-23
+更新时间：2026-08-24
 
 ## 当前阶段
 
@@ -97,7 +97,7 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 - 失效 Vault 路径清理，验证过程不创建旧目录
 - 本地文件优先于同一剪贴板对象的 bitmap
 - 像素宝箱怪桌宠作为桌面入口：整个箱体可拖拽，点击触发 Capture，带 idle/capturing/success/empty/error 动画与 golden 测试
-- 右键重新选择 Vault、退出
+- 右键弹出浅色快捷菜单（重新选择 Vault / 退出 INbox），不跟随系统 Dark Mode
 
 ### macOS adapter
 
@@ -121,7 +121,7 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 
 ## 自动化测试
 
-当前 Flutter 测试共 63 项，覆盖：
+当前 Flutter 测试共 66 项，覆盖：
 
 - 统一目录和 attachment 引用
 - macOS/Windows 标记输入生成相同 Markdown
@@ -135,6 +135,7 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 - 有效和失效 Vault 配置
 - ClipboardService contract 归一化
 - 像素宝箱怪桌宠：动画 manifest、sprite 渲染、点击/拖拽/右键、success/empty/error、reduced-motion、golden
+- 右键快捷菜单：显示/关闭、点击外部关闭、菜单项功能
 - 窗口透明 surface 与首次引导中的统一目录说明
 
 旧 Electron 11 项 Node 测试仍保留在 legacy 目录并通过，但不再作为正式客户端验收项。
@@ -146,11 +147,11 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 ```text
 flutter pub get                 通过
 dart analyze lib test           No issues found
-flutter test                    63/63 通过
+flutter test                    66/66 通过
 flutter build macos --debug     通过，产物为 INbox.app
-flutter build macos --release   通过，产物为 INbox.app
-Applications install            通过，安装到 /Applications/INbox.app
-Applications independent launch 通过，进程从 /Applications/INbox.app 启动
+flutter build macos --release   通过，产物为 Universal INbox.app (arm64+x86_64)
+GitHub Release v0.1.0           已发布，含 DMG 下载
+curl|sh 一键安装                通过，无 Gatekeeper 拦截
 macOS floating pet UI           通过，像素宝箱怪桌宠实际可见
 ```
 
@@ -165,7 +166,7 @@ flutter test
 flutter build windows
 ```
 
-工作流文件已加入仓库，但本轮没有 push，因此尚无远端 Windows runner 结果。不能据此声称 Windows 已编译通过。
+工作流文件已加入仓库并推送到远程；Windows runner 结果以实际 Actions 运行为准，不能据此声称 Windows 已编译通过。
 
 ## 已知问题与人工验证
 
