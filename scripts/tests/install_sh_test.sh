@@ -146,7 +146,22 @@ EOF
   cat > "$command_dir/ps" <<'EOF'
 #!/bin/sh
 set -eu
-cat "$INBOX_FAKE_PROCESS_FILE"
+printf '%s\n' "ps:$*" >> "$INBOX_FAKE_EVENTS"
+if [ "${INBOX_FAKE_PS_FAIL:-}" = "1" ]; then
+  exit 71
+fi
+case " $* " in
+  *ww*)
+    cat "$INBOX_FAKE_PROCESS_FILE"
+    ;;
+  *)
+    if [ "${INBOX_FAKE_TRUNCATE_PS:-}" = "1" ]; then
+      awk '{ if (length($0) > 80) print substr($0, 1, 80); else print }' "$INBOX_FAKE_PROCESS_FILE"
+    else
+      cat "$INBOX_FAKE_PROCESS_FILE"
+    fi
+    ;;
+esac
 EOF
 
   cat > "$command_dir/pgrep" <<'EOF'
@@ -254,6 +269,8 @@ run_installer() {
   INBOX_FAKE_INSTALL_APP="$tmp_dir/Apps/INbox.app" \
   INBOX_EXPECTED_DMG_URL="fixture://INbox.dmg" \
   INBOX_FAKE_STUCK_PID="${INBOX_FAKE_STUCK_PID:-}" \
+  INBOX_FAKE_PS_FAIL="${INBOX_FAKE_PS_FAIL:-}" \
+  INBOX_FAKE_TRUNCATE_PS="${INBOX_FAKE_TRUNCATE_PS:-}" \
   INBOX_FAKE_FAIL_MOVE_TO="${INBOX_FAKE_FAIL_MOVE_TO:-}" \
   INBOX_FAKE_FAIL_STAGED_TO_FINAL="${INBOX_FAKE_FAIL_STAGED_TO_FINAL:-}" \
   PATH="$command_dir:/usr/bin:/bin:/usr/sbin:/sbin" \
@@ -310,11 +327,45 @@ test_all_matching_executable_paths_receive_quit_request() {
   fi
 }
 
-run_test test_success_replaces_marker_and_opens_exact_final_path
-run_test test_staging_completes_before_old_app_is_moved
-run_test test_still_running_pid_aborts_without_touching_old_app
-run_test test_failed_staged_to_final_move_restores_old_app
-run_test test_all_matching_executable_paths_receive_quit_request
+test_spaced_long_debug_executable_aborts_before_replacement() {
+  tmp_dir="$(make_fixture)"
+  debug_executable="$tmp_dir/build output/with a very long folder name that requires wide ps output/Debug Builds/INbox.app/Contents/MacOS/INbox"
+  printf '%s\n' "444 $debug_executable" > "$tmp_dir/processes.txt"
+
+  INBOX_FAKE_TRUNCATE_PS=1 INBOX_FAKE_STUCK_PID=444 run_installer "$tmp_dir" && fail "installer should fail while spaced Debug INbox is still running"
+
+  assert_contains "$tmp_dir/quit.log" "kill:-TERM:444" "spaced Debug app process should receive TERM"
+  assert_eq "$(read_marker "$tmp_dir/Apps/INbox.app")" old "old app should remain when spaced Debug app is still running"
+  [ ! -s "$tmp_dir/open.log" ] || fail "installer should not open after spaced Debug process timeout"
+}
+
+test_ps_failure_aborts_without_touching_old_app() {
+  tmp_dir="$(make_fixture)"
+
+  INBOX_FAKE_PS_FAIL=1 run_installer "$tmp_dir" && fail "installer should fail when process enumeration fails"
+
+  assert_eq "$(read_marker "$tmp_dir/Apps/INbox.app")" old "old app should remain after ps failure"
+  assert_no_generated_backups "$tmp_dir/Apps"
+  [ ! -s "$tmp_dir/open.log" ] || fail "installer should not open after ps failure"
+}
+
+run_all_tests() {
+  run_test test_success_replaces_marker_and_opens_exact_final_path
+  run_test test_staging_completes_before_old_app_is_moved
+  run_test test_still_running_pid_aborts_without_touching_old_app
+  run_test test_failed_staged_to_final_move_restores_old_app
+  run_test test_all_matching_executable_paths_receive_quit_request
+  run_test test_spaced_long_debug_executable_aborts_before_replacement
+  run_test test_ps_failure_aborts_without_touching_old_app
+}
+
+if [ "$#" -gt 0 ]; then
+  for test_name in "$@"; do
+    run_test "$test_name"
+  done
+else
+  run_all_tests
+fi
 
 if [ "$FAILURES" -ne 0 ]; then
   printf '%s\n' "install_sh_test.sh: $FAILURES test(s) failed" >&2

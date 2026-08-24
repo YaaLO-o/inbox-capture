@@ -130,26 +130,35 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 find_running_inbox_pids() {
-  "$PS" -axo pid=,command= | while IFS= read -r line; do
-    set -- $line
-    [ "$#" -ge 2 ] || continue
-    pid="$1"
-    executable="$2"
+  process_list="$INSTALL_TMP_DIR/processes.$$"
+  if ! "$PS" -axww -o pid=,command= > "$process_list"; then
+    return 1
+  fi
+
+  while IFS= read -r line; do
+    trimmed_line=$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]+//')
+    pid="${trimmed_line%%[!0-9]*}"
 
     case "$pid" in
       ''|*[!0-9]*) continue ;;
     esac
 
-    case "$executable" in
-      *"/${APP_NAME}.app/Contents/MacOS/${APP_NAME}")
+    command_text="${trimmed_line#"$pid"}"
+    command_text=$(printf '%s\n' "$command_text" | sed -E 's/^[[:space:]]+//')
+
+    case "$command_text" in
+      *"/${APP_NAME}.app/Contents/MacOS/${APP_NAME}"|*"/${APP_NAME}.app/Contents/MacOS/${APP_NAME} "*)
         printf '%s\n' "$pid"
         ;;
     esac
-  done
+  done < "$process_list"
 }
 
 request_running_inbox_to_quit() {
-  pids="$(find_running_inbox_pids)"
+  if ! pids="$(find_running_inbox_pids)"; then
+    echo "❌ 无法枚举运行中的 INbox 进程，已停止安装以保护现有 App。" >&2
+    return 1
+  fi
   [ -n "$pids" ] || return 0
 
   echo "⏸  正在请求运行中的 INbox 退出…"
@@ -159,13 +168,19 @@ request_running_inbox_to_quit() {
 
   attempt=1
   while [ "$attempt" -le 10 ]; do
-    remaining="$(find_running_inbox_pids)"
+    if ! remaining="$(find_running_inbox_pids)"; then
+      echo "❌ 无法确认 INbox 进程是否已退出，已停止安装以保护现有 App。" >&2
+      return 1
+    fi
     [ -z "$remaining" ] && return 0
     "$SLEEP" 1
     attempt=$((attempt + 1))
   done
 
-  remaining="$(find_running_inbox_pids)"
+  if ! remaining="$(find_running_inbox_pids)"; then
+    echo "❌ 无法确认 INbox 进程是否已退出，已停止安装以保护现有 App。" >&2
+    return 1
+  fi
   if [ -n "$remaining" ]; then
     echo "❌ INbox 仍在运行，已停止安装以保护现有 App。" >&2
     echo "$remaining" | while IFS= read -r pid; do
