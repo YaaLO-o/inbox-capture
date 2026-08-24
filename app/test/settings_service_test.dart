@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:inbox_app/models/app_release.dart';
 import 'package:inbox_app/services/settings_service.dart';
 
 void main() {
@@ -53,5 +54,44 @@ void main() {
 
     expect(result, vault.path);
     expect(calls.map((call) => call.method), ['getVaultPath']);
+  });
+
+  test('getAppVersion reads the native app version boundary', () async {
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'getAppVersion') return '1.1.2';
+      throw PlatformException(code: 'UNEXPECTED', message: call.method);
+    });
+
+    final result = await SettingsService().getAppVersion();
+
+    expect(result, AppVersion.parse('1.1.2'));
+  });
+
+  test(
+    'installUpdate passes the verified dmg path to the native boundary',
+    () async {
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        return null;
+      });
+
+      await SettingsService().installUpdate('/tmp/INbox.dmg');
+
+      expect(calls.single.method, 'installUpdate');
+      expect(calls.single.arguments, {'dmgPath': '/tmp/INbox.dmg'});
+    },
+  );
+
+  test('showWindow asks the native shell to reveal INbox', () async {
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      return null;
+    });
+
+    await SettingsService().showWindow();
+
+    expect(calls.single.method, 'showWindow');
   });
 }

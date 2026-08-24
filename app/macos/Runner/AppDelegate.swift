@@ -154,6 +154,17 @@ enum SettingsChannel {
         result(nil)
       case "pickFolder":
         result(pickFolder())
+      case "getAppVersion":
+        if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+           !version.isEmpty {
+          result(version)
+        } else {
+          result(FlutterError(code: "MISSING_VERSION", message: "CFBundleShortVersionString is missing", details: nil))
+        }
+      case "showWindow":
+        controller.view.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        result(nil)
       case "setWindowSize":
         guard let args = call.arguments as? [String: Any],
               let w = args["width"] as? Double,
@@ -181,6 +192,8 @@ enum SettingsChannel {
       case "endWindowDrag":
         endWindowDrag()
         result(nil)
+      case "installUpdate":
+        result(FlutterError(code: "NOT_IMPLEMENTED", message: "DMG 安装将在后续任务接入", details: nil))
       case "quit":
         NSApp.terminate(nil)
         result(nil)
