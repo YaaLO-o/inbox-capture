@@ -193,7 +193,23 @@ enum SettingsChannel {
         endWindowDrag()
         result(nil)
       case "installUpdate":
-        result(FlutterError(code: "NOT_IMPLEMENTED", message: "DMG 安装将在后续任务接入", details: nil))
+        guard let args = call.arguments as? [String: Any],
+              let dmgPath = args["dmgPath"] as? String,
+              !dmgPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+          result(FlutterError(code: "BAD_ARGS", message: "installUpdate 需要 dmgPath", details: nil))
+          return
+        }
+        UpdateInstaller.prepare(dmgPath: dmgPath) { installResult in
+          switch installResult {
+          case .success:
+            result(nil)
+            DispatchQueue.main.async {
+              NSApp.terminate(nil)
+            }
+          case .failure(let error):
+            result(FlutterError(code: error.flutterCode, message: error.message, details: nil))
+          }
+        }
       case "quit":
         NSApp.terminate(nil)
         result(nil)

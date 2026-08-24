@@ -27,4 +27,36 @@ class RunnerTests: XCTestCase {
 
     XCTAssertEqual(received, [.showWindow, .checkForUpdates, .quit])
   }
+
+  func testUpdatePathsStayBesideApplicationsInstall() {
+    let paths = UpdatePaths(installApp: URL(fileURLWithPath: "/Applications/INbox.app"), pid: 42)
+
+    XCTAssertEqual(paths.staged.path, "/Applications/.INbox.app.installing.42")
+    XCTAssertEqual(paths.backup.path, "/Applications/.INbox.app.backup.42")
+  }
+
+  func testHdiutilAttachPlistMountPointIsParsed() throws {
+    let plist = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" \
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>system-entities</key>
+      <array>
+        <dict>
+          <key>content-hint</key>
+          <string>Apple_HFS</string>
+          <key>mount-point</key>
+          <string>/Volumes/INbox</string>
+        </dict>
+      </array>
+    </dict>
+    </plist>
+    """
+
+    let mountPoint = try UpdateInstaller.mountPoint(fromAttachPlist: Data(plist.utf8))
+
+    XCTAssertEqual(mountPoint.path, "/Volumes/INbox")
+  }
 }
