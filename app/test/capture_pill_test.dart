@@ -120,7 +120,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('重新选择 Vault'), findsOneWidget);
-    expect(find.text('退出'), findsOneWidget);
+    expect(find.text('退出 INbox'), findsOneWidget);
     expect(capture.calls, 0);
   });
 
@@ -162,9 +162,68 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('退出'));
+    await tester.tap(find.text('退出 INbox'));
     await tester.pumpAndSettle();
 
     expect(calls.map((call) => call.method), contains('quit'));
+  });
+
+  testWidgets('菜单默认不显示', (tester) async {
+    final capture = FakeCaptureService(
+      const CaptureResult(CaptureStatus.saved),
+    );
+    await pumpPill(tester, capture: capture);
+
+    expect(find.text('重新选择 Vault'), findsNothing);
+    expect(find.text('退出 INbox'), findsNothing);
+  });
+
+  testWidgets('点击菜单外部区域关闭菜单', (tester) async {
+    final capture = FakeCaptureService(
+      const CaptureResult(CaptureStatus.saved),
+    );
+    await pumpPill(tester, capture: capture);
+
+    // 右键打开菜单
+    final center = tester.getCenter(find.bySemanticsLabel('保存到 INbox'));
+    final gesture = await tester.startGesture(
+      center,
+      buttons: kSecondaryMouseButton,
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text('重新选择 Vault'), findsOneWidget);
+
+    // 点击窗口底部空白区域（菜单外部）
+    await tester.tapAt(const Offset(130, 220));
+    await tester.pumpAndSettle();
+    expect(find.text('重新选择 Vault'), findsNothing);
+  });
+
+  testWidgets('再次右键关闭菜单', (tester) async {
+    final capture = FakeCaptureService(
+      const CaptureResult(CaptureStatus.saved),
+    );
+    await pumpPill(tester, capture: capture);
+
+    final center = tester.getCenter(find.bySemanticsLabel('保存到 INbox'));
+
+    // 第一次右键：打开
+    var gesture = await tester.startGesture(
+      center,
+      buttons: kSecondaryMouseButton,
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text('重新选择 Vault'), findsOneWidget);
+
+    // 第二次右键：关闭
+    gesture = await tester.startGesture(
+      center,
+      buttons: kSecondaryMouseButton,
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+    expect(find.text('重新选择 Vault'), findsNothing);
   });
 }

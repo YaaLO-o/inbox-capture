@@ -1,13 +1,16 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/capture_service.dart';
 import '../services/settings_service.dart';
+import 'pet/pet_popup_menu.dart';
 import 'pet/pixel_chest_pet.dart';
 import 'pet/pixel_chest_sprite.dart';
 import 'window_surface.dart';
+import 'window_sizes.dart';
 
 /// 两个平台共用的低摩擦悬浮采集入口。
 class CapturePill extends StatefulWidget {
@@ -30,6 +33,7 @@ class _CapturePillState extends State<CapturePill> {
   static final SettingsService _settings = SettingsService();
 
   late final Future<ui.Image> _atlasFuture;
+  bool _menuOpen = false;
 
   @override
   void initState() {
@@ -37,57 +41,88 @@ class _CapturePillState extends State<CapturePill> {
     _atlasFuture = loadPixelChestAtlas(rootBundle);
   }
 
-  void _showMenu(BuildContext context, Offset position) {
-    showMenu<String>(
-      context: context,
-      position: RelativeRect.fromLTRB(
-        position.dx,
-        position.dy,
-        position.dx + 1,
-        position.dy + 1,
-      ),
-      color: const Color(0xFF2A2A33),
-      items: const [
-        PopupMenuItem(
-          value: 'vault',
-          child: Text('重新选择 Vault', style: TextStyle(fontSize: 12.5)),
-        ),
-        PopupMenuItem(
-          value: 'quit',
-          child: Text('退出', style: TextStyle(fontSize: 12.5)),
-        ),
-      ],
-    ).then((value) {
-      if (!mounted) return;
-      if (value == 'vault') widget.onChangeVault();
-      if (value == 'quit') _settings.quit();
-    });
+  void _toggleMenu() {
+    setState(() => _menuOpen = !_menuOpen);
+    _syncWindowSize();
   }
+
+  void _closeMenu() {
+    if (!_menuOpen) return;
+    setState(() => _menuOpen = false);
+    _syncWindowSize();
+  }
+
+  void _syncWindowSize() {
+    final h = _menuOpen
+        ? WindowSizes.pillHeight + PetPopupMenu.menuHeight + _menuGap
+        : WindowSizes.pillHeight;
+    _settings.setWindowSize(WindowSizes.pillWidth, h);
+  }
+
+  static const double _menuGap = 4;
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: Builder(
-        builder: (menuContext) => Scaffold(
-          backgroundColor: captureWindowSurfaceColor(
-            Theme.of(context).platform,
-          ),
-          body: FutureBuilder<ui.Image>(
-            future: _atlasFuture,
-            builder: (context, snapshot) {
-              final atlas = snapshot.data;
-              if (atlas == null) {
-                return const Center(child: SizedBox.square(dimension: 96));
-              }
-              return PixelChestPet(
-                atlas: atlas,
-                onCapture: () => widget.capture.captureNow(widget.vaultPath),
-                onMove: (delta) => _settings.moveWindowBy(delta.dx, delta.dy),
-                onSecondaryTap: (position) => _showMenu(menuContext, position),
-              );
-            },
-          ),
+      theme: ThemeData.light(useMaterial3: true),
+      home: Material(
+        color: captureWindowSurfaceColor(defaultTargetPlatform),
+        child: FutureBuilder<ui.Image>(
+          future: _atlasFuture,
+          builder: (context, snapshot) {
+            final atlas = snapshot.data;
+            if (atlas == null) {
+              return const Center(child: SizedBox.square(dimension: 96));
+            }
+            return Stack(
+              fit: StackFit.expand,
+              alignment: Alignment.topCenter,
+              clipBehavior: Clip.none,
+              children: [
+                // 桌宠
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    PixelChestPet(
+                      atlas: atlas,
+                      onCapture: () =>
+                          widget.capture.captureNow(widget.vaultPath),
+                      onMove: (delta) =>
+                          _settings.moveWindowBy(delta.dx, delta.dy),
+                      onSecondaryTap: (_) => _toggleMenu(),
+                    ),
+                  ],
+                ),
+                // 透明遮罩：菜单打开时点击外部关闭
+                if (_menuOpen)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _closeMenu,
+                      onSecondaryTap: _closeMenu,
+                      onPanStart: (_) => _closeMenu(),
+                    ),
+                  ),
+                // 菜单（在遮罩之上，不被拦截）
+                if (_menuOpen)
+                  Positioned(
+                    top: WindowSizes.pillHeight + _menuGap,
+                    left: 0,
+                    child: PetPopupMenu(
+                      onSelectVault: () {
+                        _closeMenu();
+                        widget.onChangeVault();
+                      },
+                      onQuit: () {
+                        _closeMenu();
+                        _settings.quit();
+                      },
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );
