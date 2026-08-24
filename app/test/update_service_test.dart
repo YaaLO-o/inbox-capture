@@ -89,6 +89,8 @@ void main() {
 
     final file = await service.download(release, onProgress: progress.add);
 
+    expect(file.parent.path, isNot(directory.path));
+    expect(file.parent.parent.path, directory.path);
     expect(await file.readAsBytes(), const [1, 2, 3, 4]);
     expect(progress, isNotEmpty);
     expect(progress.last.received, 4);

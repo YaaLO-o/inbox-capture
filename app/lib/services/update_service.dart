@@ -65,6 +65,7 @@ class UpdateService {
     void Function(DownloadProgress progress)? onProgress,
   }) async {
     final client = _httpClientFactory();
+    Directory? tempDirectory;
     File? file;
 
     try {
@@ -77,8 +78,10 @@ class UpdateService {
         );
       }
 
-      final fileName = 'inbox-update-${DateTime.now().microsecondsSinceEpoch}.dmg';
-      file = File('${_downloadDirectory.path}${Platform.pathSeparator}$fileName');
+      tempDirectory = await _downloadDirectory.createTemp('inbox-update_');
+      file = File(
+        '${tempDirectory.path}${Platform.pathSeparator}${AppRelease.assetName}',
+      );
       final sink = file.openWrite();
       var received = 0;
       final total = response.contentLength >= 0 ? response.contentLength : release.size;
@@ -102,7 +105,9 @@ class UpdateService {
 
       return file;
     } catch (_) {
-      if (file != null && await file.exists()) {
+      if (tempDirectory != null && await tempDirectory.exists()) {
+        await tempDirectory.delete(recursive: true);
+      } else if (file != null && await file.exists()) {
         await file.delete();
       }
       rethrow;
