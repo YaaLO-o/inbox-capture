@@ -40,8 +40,9 @@ if [ "$(uname -s)" != "Darwin" ]; then
 fi
 
 echo "🦊 正在下载 INbox…"
-# -f 失败返回错误码，-s 静默，-S 配合 -s 在出错时仍显示错误，-L 跟随重定向
-if ! curl -fsSL -o "$DMG_PATH" "$DMG_URL"; then
+# -f 失败返回错误码，-L 跟随重定向
+# 不加 -s：让 curl 显示实时进度条（速度、百分比、剩余时间）
+if ! curl -fL --progress-bar -o "$DMG_PATH" "$DMG_URL"; then
   echo "❌ 下载失败：$DMG_URL" >&2
   exit 1
 fi
@@ -98,15 +99,14 @@ echo "   首次启动：在「应用程序」里双击 INbox，或运行：open 
 echo "   （若仍被 Gatekeeper 提示，右键 → 打开；正常情况下用本脚本安装不会有该提示）"
 echo ""
 
-# 询问是否立即启动
-if [ -t 0 ]; then
+# 询问是否立即启动（从 /dev/tty 读取，兼容 curl | sh 管道模式）
+if [ -e /dev/tty ]; then
   printf "🚀 现在启动 INbox？[Y/n] "
-  read -r answer
+  read -r answer < /dev/tty
   case "$answer" in
     [nN]*) echo "好的，你可以稍后在 Applications 里打开。" ;;
     *) open -a "$APP_NAME" && echo "已启动！" ;;
   esac
 else
-  # 非交互式（curl | sh）直接启动
   open -a "$APP_NAME" && echo "已启动 INbox！"
 fi
