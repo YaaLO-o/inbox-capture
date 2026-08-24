@@ -36,7 +36,7 @@ class _UpdateViewState extends State<UpdateView> {
   _UpdateState _state = _UpdateState.checking;
   AppRelease? _release;
   DownloadProgress? _progress;
-  bool _installActive = false;
+  bool _operationActive = false;
 
   @override
   void initState() {
@@ -67,6 +67,7 @@ class _UpdateViewState extends State<UpdateView> {
     setState(() {
       _state = _UpdateState.downloading;
       _progress = null;
+      _operationActive = true;
     });
 
     try {
@@ -80,23 +81,22 @@ class _UpdateViewState extends State<UpdateView> {
       if (!mounted) return;
       setState(() {
         _state = _UpdateState.installing;
-        _installActive = true;
       });
       await widget.installer(file.path);
       if (!mounted) return;
-      setState(() => _installActive = false);
+      setState(() => _operationActive = false);
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _state = _UpdateState.error;
-        _installActive = false;
+        _operationActive = false;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final canClose = !_installActive;
+    final canClose = !_operationActive;
 
     return Scaffold(
       backgroundColor: const Color(0xFF1E1E24),

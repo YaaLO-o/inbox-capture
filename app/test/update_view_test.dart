@@ -133,6 +133,47 @@ void main() {
     expect(closes, 1);
   });
 
+  testWidgets('keeps close disabled while a download is in flight', (
+    tester,
+  ) async {
+    final service = FakeUpdateService();
+    var closes = 0;
+    var visible = true;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setHostState) {
+            if (!visible) return const SizedBox.shrink();
+            return UpdateView(
+              currentVersion: AppVersion.parse('1.1.1'),
+              service: service,
+              installer: (_) async {},
+              onClose: () {
+                closes += 1;
+                setHostState(() => visible = false);
+              },
+            );
+          },
+        ),
+      ),
+    );
+    service.completeFetch(release('1.1.2'));
+    await tester.pump();
+
+    await tester.tap(find.text('下载并安装'));
+    await tester.pump();
+    service.reportProgress(const DownloadProgress(received: 50, total: 100));
+    await tester.pump();
+
+    await tester.tap(find.text('关闭'));
+    await tester.pump();
+
+    expect(closes, 0);
+    expect(find.text('正在下载更新…'), findsOneWidget);
+    expect(find.text('50%'), findsOneWidget);
+  });
+
   testWidgets('shows current state when latest release is not newer', (
     tester,
   ) async {
