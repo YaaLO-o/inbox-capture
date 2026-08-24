@@ -101,6 +101,7 @@ enum ClipboardChannel {
 enum SettingsChannel {
   static let channelName = "com.inbox.app/settings"
   private static let vaultKey = "vaultPath"
+  private static var windowDragSession: WindowDragSession?
 
   static func register(with controller: FlutterViewController) {
     let channel = FlutterMethodChannel(name: channelName, binaryMessenger: controller.engine.binaryMessenger)
@@ -137,6 +138,15 @@ enum SettingsChannel {
           result(FlutterError(code: "BAD_ARGS", message: "moveWindowBy 需要 dx/dy", details: nil)); return
         }
         moveWindowBy(controller: controller, dx: dx, dy: dy)
+        result(nil)
+      case "beginWindowDrag":
+        beginWindowDrag(controller: controller)
+        result(nil)
+      case "updateWindowDrag":
+        updateWindowDrag(controller: controller)
+        result(nil)
+      case "endWindowDrag":
+        endWindowDrag()
         result(nil)
       case "quit":
         NSApp.terminate(nil)
@@ -181,6 +191,27 @@ enum SettingsChannel {
       x: window.frame.origin.x + CGFloat(dx),
       y: window.frame.origin.y - CGFloat(dy)
     ))
+  }
+
+  private static func beginWindowDrag(controller: FlutterViewController) {
+    guard let window = controller.view.window else {
+      windowDragSession = nil
+      return
+    }
+    windowDragSession = WindowDragSession(
+      mouseOrigin: NSEvent.mouseLocation,
+      windowOrigin: window.frame.origin
+    )
+  }
+
+  private static func updateWindowDrag(controller: FlutterViewController) {
+    guard let window = controller.view.window,
+          let session = windowDragSession else { return }
+    window.setFrameOrigin(session.origin(for: NSEvent.mouseLocation))
+  }
+
+  private static func endWindowDrag() {
+    windowDragSession = nil
   }
 
   private static func pickFolder() -> String? {

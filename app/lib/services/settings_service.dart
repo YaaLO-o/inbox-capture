@@ -45,6 +45,12 @@ class SettingsService {
   Future<void> moveWindowBy(double dx, double dy) =>
       _channel.invokeMethod('moveWindowBy', {'dx': dx, 'dy': dy});
 
+  Future<void> beginWindowDrag() => _channel.invokeMethod('beginWindowDrag');
+
+  Future<void> updateWindowDrag() => _channel.invokeMethod('updateWindowDrag');
+
+  Future<void> endWindowDrag() => _channel.invokeMethod('endWindowDrag');
+
   /// 退出应用。
   Future<void> quit() => _channel.invokeMethod('quit');
 }

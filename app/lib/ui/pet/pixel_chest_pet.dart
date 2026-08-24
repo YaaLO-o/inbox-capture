@@ -13,6 +13,9 @@ class PixelChestPet extends StatefulWidget {
   final Future<CaptureResult> Function() onCapture;
   final ValueChanged<Offset> onMove;
   final ValueChanged<Offset> onSecondaryTap;
+  final VoidCallback? onDragStart;
+  final VoidCallback? onDragUpdate;
+  final VoidCallback? onDragEnd;
 
   const PixelChestPet({
     super.key,
@@ -20,6 +23,9 @@ class PixelChestPet extends StatefulWidget {
     required this.onCapture,
     required this.onMove,
     required this.onSecondaryTap,
+    this.onDragStart,
+    this.onDragUpdate,
+    this.onDragEnd,
   });
 
   @override
@@ -299,7 +305,16 @@ class _PixelChestPetState extends State<PixelChestPet>
                       key: const Key('pet-visible-region'),
                       behavior: HitTestBehavior.opaque,
                       onTap: _capture,
-                      onPanUpdate: (details) => widget.onMove(details.delta),
+                      onPanStart: (_) => widget.onDragStart?.call(),
+                      onPanUpdate: (details) {
+                        if (widget.onDragUpdate != null) {
+                          widget.onDragUpdate!.call();
+                          return;
+                        }
+                        widget.onMove(details.delta);
+                      },
+                      onPanEnd: (_) => widget.onDragEnd?.call(),
+                      onPanCancel: () => widget.onDragEnd?.call(),
                       onSecondaryTapUp: (details) =>
                           widget.onSecondaryTap(details.globalPosition),
                     ),

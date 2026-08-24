@@ -1,6 +1,18 @@
 import Cocoa
 import FlutterMacOS
 
+struct WindowDragSession {
+  let mouseOrigin: NSPoint
+  let windowOrigin: NSPoint
+
+  func origin(for mouse: NSPoint) -> NSPoint {
+    NSPoint(
+      x: windowOrigin.x + mouse.x - mouseOrigin.x,
+      y: windowOrigin.y + mouse.y - mouseOrigin.y
+    )
+  }
+}
+
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -30,7 +42,7 @@ class MainFlutterWindow: NSWindow {
     self.standardWindowButton(.closeButton)?.isHidden = true
     self.standardWindowButton(.miniaturizeButton)?.isHidden = true
     self.standardWindowButton(.zoomButton)?.isHidden = true
-    self.isMovableByWindowBackground = true
+    self.isMovableByWindowBackground = false
     self.isReleasedWhenClosed = false
     self.level = .floating
     self.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
