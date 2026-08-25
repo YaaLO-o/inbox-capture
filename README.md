@@ -40,38 +40,51 @@
 - 🆔 每条记录都有稳定、唯一的隐藏 `capture:id`，为以后的整理、引用留好锚点
 - 👾 **像素宝箱怪桌宠**：置顶在桌面右上角，整个身体可拖拽，点击采集，带开箱动画反馈；右键切换库或退出
 - 🔍 **不后台监听剪贴板**——只有你点击的那一瞬间才读一次
-- 🙈 **完全本地**：没有服务器、没有账号、没有网络请求、不上传任何内容
+- 🙈 **采集和存储完全本地**，没有服务器、没有账号、不上传任何内容
 
 ## 隐私
 
 INbox 的设计原则是"你的东西只属于你"：
 
 - Obsidian Vault 是**唯一存储层**，数据就是你电脑上的文件
-- 不使用数据库，不建账号，不请求网络权限
+- 不使用数据库，不建账号
 - 不跟踪、不上报、不分析
+- 只有你在菜单栏点「检查更新」，或主动运行安装命令时，INbox 才会联系 GitHub
 - 源代码完全开放，可以自行审计
 
 ## 安装
 
 ### 方式一：终端一键安装（推荐）
 
-复制下面这行到「终端」回车，会自动下载最新版并安装到 `/Applications`：
+复制下面这行到「终端」回车，会自动下载最新版并安装到 `/Applications/INbox.app`。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/YaaLO-o/inbox-capture/main/scripts/install.sh | sh
 ```
 
-用这种方式安装**不会出现"无法验证开发者"的提示**——原理和 Homebrew 的 `brew install --no-quarantine` 相同。
+用这种方式安装不会出现「无法验证开发者」的提示。原理和 Homebrew 的 `brew install --no-quarantine` 相同。
+
+正在使用 1.1.0 或更早版本时，请运行一次这条命令升级到 1.1.1。完成这次升级后，通常不再需要重复运行命令。
 
 ### 方式二：手动下载 DMG
 
 <a href="https://github.com/YaaLO-o/inbox-capture/releases/latest/download/INbox-macos-universal.dmg"><b>⬇ 下载 INbox for macOS（Universal DMG）</b></a>
 
-下载后双击 DMG，把 `INbox` 拖入「应用程序」。
+下载后双击 DMG，把 `INbox` 拖入「应用程序」。安装完成后的路径应为 `/Applications/INbox.app`。
 
-> 首次打开若被 Gatekeeper 拦截，请**右键 → 打开**，或到「系统设置 → 隐私与安全性」点「仍要打开」。这是因为当前版本尚未购买 Apple Developer ID 进行签名和公证（应用完全本地运行、不联网）；用上面的**终端一键安装可绕过此提示**。完整说明见[安装指南](.github/DOWNLOAD.md)。
+> 首次打开若被 Gatekeeper 拦截，请**右键 → 打开**，或到「系统设置 → 隐私与安全性」点「仍要打开」。当前版本尚未使用 Apple Developer ID 签名和公证。日常采集完全本地运行，只有显式更新操作会联系 GitHub。上面的终端一键安装可绕过此提示。完整说明见[安装指南](.github/DOWNLOAD.md)。
 
 支持 Apple Silicon（M 系列）和 Intel 芯片。
+
+### 1.1.1 及后续版本的更新
+
+正常更新时，点 macOS 菜单栏里的 INbox 图标，再点「检查更新」。INbox 会在本机校验下载文件，校验成功后替换 `/Applications/INbox.app` 并重新打开。网络断开、校验失败或安装失败时，当前版本会保留。
+
+上面的终端命令仍然保留。当菜单更新无法打开，或一次更新被中断时，可以用它恢复到最新版。
+
+### 窗口与退出
+
+INbox 窗口保留 macOS 的红黄绿按钮。点红色关闭按钮只会隐藏窗口，应用会继续运行。需要重新打开时，点菜单栏里的 INbox 图标，再点「显示 INbox」。需要结束进程时，请点「完全退出」。
 
 ## 数据存在哪
 
@@ -117,7 +130,8 @@ flutter run -d macos
 ```bash
 dart analyze lib test
 flutter test
-flutter build macos --release
+cd ..
+sh scripts/release_macos.sh 1.1.1
 ```
 
 项目用 Flutter 共享一套 Dart 代码（模型、采集逻辑、存储、UI），macOS 和 Windows 各有很薄的原生适配层（剪贴板、文件夹选择、窗口控制）。
