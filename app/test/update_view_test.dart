@@ -2,9 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:inbox_app/main.dart';
 import 'package:inbox_app/models/app_release.dart';
 import 'package:inbox_app/services/settings_service.dart';
 import 'package:inbox_app/services/update_service.dart';
@@ -37,54 +35,6 @@ void main() {
       ),
     );
   }
-
-  Future<void> sendCommand(String method) {
-    const channel = MethodChannel('com.inbox.app/commands');
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    final encoded = channel.codec.encodeMethodCall(MethodCall(method));
-    final completer = Completer<void>();
-    messenger.handlePlatformMessage(channel.name, encoded, (ByteData? data) {
-      completer.complete();
-    });
-    return completer.future;
-  }
-
-  testWidgets(
-    'command opens update view and close restores capture pill size',
-    (tester) async {
-      final vault = Directory.systemTemp.createTempSync('inbox_vault_');
-      final settings = FakeSettingsService(
-        vaultPath: vault.path,
-        version: AppVersion.parse('1.1.1'),
-      );
-      final service = FakeUpdateService();
-      addTearDown(() => vault.deleteSync(recursive: true));
-
-      await tester.pumpWidget(
-        InboxApp(settings: settings, updateService: service),
-      );
-      await tester.pump();
-      await tester.pump();
-
-      await sendCommand('checkForUpdates');
-      await tester.pump();
-
-      expect(settings.shows, 1);
-      expect(settings.sizes, contains(const WindowSizeCall(420, 300, false)));
-      expect(find.text('正在检查更新…'), findsOneWidget);
-
-      service.completeFetch(release('1.1.2'));
-      await tester.pump();
-
-      expect(find.text('发现新版本 1.1.2'), findsOneWidget);
-
-      await tester.tap(find.text('关闭'));
-      await tester.pump();
-
-      expect(settings.sizes.last, const WindowSizeCall(132, 132, false));
-    },
-  );
 
   testWidgets('shows available update, download progress, and install state', (
     tester,

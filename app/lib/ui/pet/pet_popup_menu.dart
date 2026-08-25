@@ -7,17 +7,19 @@ import 'package:flutter/material.dart';
 /// 宽度与桌宠窗口一致（132），展开时窗口仅向下增高。
 class PetPopupMenu extends StatelessWidget {
   final VoidCallback? onSelectVault;
+  final VoidCallback? onCheckUpdates;
   final VoidCallback? onQuit;
 
   const PetPopupMenu({
     super.key,
     this.onSelectVault,
+    this.onCheckUpdates,
     this.onQuit,
   });
 
   static const double menuWidth = 132;
   static const double itemHeight = 44;
-  static const double menuHeight = itemHeight * 2;
+  static const double menuHeight = itemHeight * 3;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +43,11 @@ class PetPopupMenu extends StatelessWidget {
           _MenuItem(
             label: '重新选择 Vault',
             onTap: onSelectVault,
+            showDivider: true,
+          ),
+          _MenuItem(
+            label: '检查更新',
+            onTap: onCheckUpdates,
             showDivider: true,
           ),
           _MenuItem(

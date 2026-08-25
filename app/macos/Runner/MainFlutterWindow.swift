@@ -65,8 +65,7 @@ class MainFlutterWindow: NSWindow {
     // 即时布局，确保 Flutter 首帧拿到正确尺寸。
     self.layoutIfNeeded()
 
-    // 不在 Dock 上显示独立任务图标，保持工具属性；通过 App 菜单可退出。
-    // NSApp.setActivationPolicy(.accessory) 会同时隐藏 Dock 图标。
+    // 不在 Dock 显示图标，保持菜单栏工具属性。
     NSApp.setActivationPolicy(.accessory)
     NSApp.activate(ignoringOtherApps: true)
   }

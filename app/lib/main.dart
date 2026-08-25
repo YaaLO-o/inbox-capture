@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'models/app_release.dart';
-import 'services/app_command_service.dart';
 import 'services/capture_service.dart';
 import 'services/clipboard_service.dart';
 import 'services/settings_service.dart';
@@ -20,13 +19,11 @@ void main() {
 class InboxApp extends StatefulWidget {
   final SettingsService? settings;
   final UpdateService? updateService;
-  final AppCommandService? commandService;
 
   const InboxApp({
     super.key,
     this.settings,
     this.updateService,
-    this.commandService,
   });
 
   @override
@@ -37,7 +34,6 @@ class _InboxAppState extends State<InboxApp> {
   late final SettingsService _settings;
   late final CaptureService _capture;
   late final UpdateService _updates;
-  late final AppCommandService _commands;
 
   String? _vaultPath;
   AppVersion? _currentVersion;
@@ -49,19 +45,11 @@ class _InboxAppState extends State<InboxApp> {
     super.initState();
     _settings = widget.settings ?? SettingsService();
     _updates = widget.updateService ?? UpdateService();
-    _commands = widget.commandService ?? AppCommandService();
     _capture = CaptureService(
       clipboard: ClipboardService(),
       storage: StorageService(),
     );
-    _commands.start(onCheckForUpdates: _showUpdates);
     _boot();
-  }
-
-  @override
-  void dispose() {
-    _commands.dispose();
-    super.dispose();
   }
 
   Future<void> _boot() async {
@@ -182,6 +170,7 @@ class _InboxAppState extends State<InboxApp> {
       vaultPath: path,
       capture: _capture,
       onChangeVault: _changeVault,
+      onCheckUpdates: _showUpdates,
     );
   }
 }

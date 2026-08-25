@@ -17,12 +17,14 @@ class CapturePill extends StatefulWidget {
   final String vaultPath;
   final CaptureService capture;
   final void Function() onChangeVault;
+  final void Function() onCheckUpdates;
 
   const CapturePill({
     super.key,
     required this.vaultPath,
     required this.capture,
     required this.onChangeVault,
+    required this.onCheckUpdates,
   });
 
   @override
@@ -125,6 +127,10 @@ class _CapturePillState extends State<CapturePill> {
                       onSelectVault: () {
                         _closeMenu();
                         widget.onChangeVault();
+                      },
+                      onCheckUpdates: () {
+                        _closeMenu();
+                        widget.onCheckUpdates();
                       },
                       onQuit: () {
                         _closeMenu();

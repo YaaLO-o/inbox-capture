@@ -17,17 +17,6 @@ class RunnerTests: XCTestCase {
     )
   }
 
-  func testStatusMenuDispatchesEverySupportedAction() {
-    var received: [StatusMenuAction] = []
-    let dispatcher = StatusMenuDispatcher { received.append($0) }
-
-    dispatcher.dispatch(.showWindow)
-    dispatcher.dispatch(.checkForUpdates)
-    dispatcher.dispatch(.quit)
-
-    XCTAssertEqual(received, [.showWindow, .checkForUpdates, .quit])
-  }
-
   func testUpdatePathsStayBesideApplicationsInstall() {
     let paths = UpdatePaths(installApp: URL(fileURLWithPath: "/Applications/INbox.app"), pid: 42)
 

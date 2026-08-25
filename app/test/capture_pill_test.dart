@@ -56,12 +56,14 @@ void main() {
     WidgetTester tester, {
     required FakeCaptureService capture,
     VoidCallback? onChangeVault,
+    VoidCallback? onCheckUpdates,
   }) async {
     await tester.pumpWidget(
       CapturePill(
         vaultPath: '/unused',
         capture: capture,
         onChangeVault: onChangeVault ?? () {},
+        onCheckUpdates: onCheckUpdates ?? () {},
       ),
     );
     final atlasFuture = tester
@@ -162,6 +164,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('重新选择 Vault'), findsOneWidget);
+    expect(find.text('检查更新'), findsOneWidget);
     expect(find.text('退出 INbox'), findsOneWidget);
     expect(capture.calls, 0);
   });
@@ -210,6 +213,26 @@ void main() {
     expect(calls.map((call) => call.method), contains('quit'));
   });
 
+  testWidgets('检查更新菜单调用 onCheckUpdates', (tester) async {
+    var checks = 0;
+    final capture = FakeCaptureService(
+      const CaptureResult(CaptureStatus.saved),
+    );
+    await pumpPill(tester, capture: capture, onCheckUpdates: () => checks += 1);
+    final center = tester.getCenter(find.bySemanticsLabel('保存到 INbox'));
+    final gesture = await tester.startGesture(
+      center,
+      buttons: kSecondaryMouseButton,
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('检查更新'));
+    await tester.pumpAndSettle();
+
+    expect(checks, 1);
+  });
+
   testWidgets('菜单默认不显示', (tester) async {
     final capture = FakeCaptureService(
       const CaptureResult(CaptureStatus.saved),
@@ -217,6 +240,7 @@ void main() {
     await pumpPill(tester, capture: capture);
 
     expect(find.text('重新选择 Vault'), findsNothing);
+    expect(find.text('检查更新'), findsNothing);
     expect(find.text('退出 INbox'), findsNothing);
   });
 
