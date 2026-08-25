@@ -51,6 +51,8 @@ The Android `ResolverActivity` displayed `INbox` among Quick Share, Chrome, Gmai
 
 ## Review fixes
 
+Activity-level outcome verification now runs against the real `ShareCaptureActivity` using `ActivityScenario` and a narrow internal test hook for only the bridge callback. Instrumentation covered immediate saved success, immediate bridge error, the full 10,000 ms readiness-timeout delay, and duplicate callbacks. Each case observed exactly one feedback outcome and one finish; the focused class passed 4/4 on `Pixel_6_API36` in 18 seconds.
+
 - `EXTRA_TEXT` is read as `CharSequence` and converted to `String`, preserving styled-share characters; an instrumentation regression covers `SpannableString`.
 - `ShareCaptureActivity` handles orientation, screen-size, and smallest-screen-size changes without recreation. `ShareCaptureActivityConfigTest` verifies those manifest flags, while `ShareCaptureCoordinatorTest` verifies one submission/outcome for success, bridge error, and the existing ten-second readiness-timeout result (including duplicate callbacks).
 - Focused native checks passed: `:app:testDebugUnitTest`, `:app:connectedDebugAndroidTest` (18 tests on `Pixel_6_API36`), and `:app:assembleDebug`. Flutter tests passed (120 tests).
