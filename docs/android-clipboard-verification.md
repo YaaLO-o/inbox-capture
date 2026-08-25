@@ -55,17 +55,17 @@ Pass criterion remains at least 14/15 exact saves, no hang, and no navigation to
 
 ### Xiaomi preparation and Chrome gate attempt
 
-The connected device was recorded as Xiaomi 13 Pro / `nuwa` / `2210132C`, API 36, fingerprint `Xiaomi/nuwa/nuwa:16/BP2A.250605.031.A3/OS3.0.310.0.WMBCNXM:user/release-keys`, HyperOS `OS3.0.310.0.WMBCNXM`. INbox and its androidTest APK were installed with `adb install -r -t` after USB installation authorization. The SAF descriptor persisted as `content://com.android.externalstorage.documents/tree/primary%3A测试`, display name `测试`; shell access was denied as expected because the grant belongs to INbox.
+The connected device was recorded as Xiaomi 13 Pro / `nuwa` / `2210132C`, API 36, fingerprint `Xiaomi/nuwa/nuwa:16/BP2A.250605.031.A3/OS3.0.310.0.WMBCNXM:user/release-keys`, HyperOS `OS3.0.310.0.WMBCNXM`. INbox and its androidTest APK were installed with `adb install -r -t` after USB installation authorization. The SAF descriptor persisted as `content://com.android.externalstorage.documents/tree/primary%3A测试`, display name `测试`; shell access was denied as expected because the grant belongs to INbox. For the gate only, a debug APK with the Activity temporarily exported was installed (SHA-256 `c143b6e1249658677c162de4aebf02b488b71ab7f5910338a4a31b5674c641c6`); the source manifest was restored to non-exported immediately after the minimal launch check.
 
-After the user copied the authorized Chrome token and left Chrome visible, Chrome attempt 1 was invoked through the app-owned manual instrumentation harness. The instrumentation emitted the test-start status but did not return within 60 seconds; no `INboxClipboardProbe` facts were emitted, no Activity exit was observed, and the Markdown token occurrence count remained 0. The attempt was stopped as a harness hang; attempts 2–5 were not run.
+After the user copied the authorized Chrome token and left Chrome visible, five explicit component launches were performed one at a time using the temporary gate APK. Every attempt reached focus, observed one non-empty clip, returned `saved`, exited, returned Chrome to the foreground, and incremented the count-only Markdown occurrence by exactly one. Baseline count was 1; final count was 6.
 
 | # | Source app | Result | Probe facts | Activity exit | Markdown occurrence delta |
 |---:|---|---|---|---|---:|
-| 1 | Chrome | HUNG | No probe log emitted | No | 0 |
-| 2 | Chrome | not run |  |  |  |
-| 3 | Chrome | not run |  |  |  |
-| 4 | Chrome | not run |  |  |  |
-| 5 | Chrome | not run |  |  |  |
+| 1 | Chrome | saved | focus, clip count=1, non-empty=true, bridge status=saved | Yes; Chrome foreground | +1 (2) |
+| 2 | Chrome | saved | focus, clip count=1, non-empty=true, bridge status=saved | Yes; Chrome foreground | +1 (3) |
+| 3 | Chrome | saved | focus, clip count=1, non-empty=true, bridge status=saved | Yes; Chrome foreground | +1 (4) |
+| 4 | Chrome | saved | focus, clip count=1, non-empty=true, bridge status=saved | Yes; Chrome foreground | +1 (5) |
+| 5 | Chrome | saved | focus, clip count=1, non-empty=true, bridge status=saved | Yes; Chrome foreground | +1 (6) |
 
 Repeatable app-owned harness command after installing both APKs without clearing app data:
 
