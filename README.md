@@ -64,7 +64,7 @@ curl -fsSL https://raw.githubusercontent.com/YaaLO-o/inbox-capture/main/scripts/
 
 用这种方式安装不会出现「无法验证开发者」的提示。原理和 Homebrew 的 `brew install --no-quarantine` 相同。
 
-正在使用 1.1.0 或更早版本时，请运行一次这条命令升级到 1.1.1。完成这次升级后，通常不再需要重复运行命令。
+正在使用 1.1.0 或更早版本时，请运行一次这条命令升级到 1.1.1。之后也可以直接在菜单栏点「检查更新」自动升级。
 
 ### 方式二：手动下载 DMG
 
@@ -139,6 +139,8 @@ sh scripts/release_macos.sh 1.1.1
 ## 路线图
 
 - ✅ macOS 文字 / 图片 / 文件采集，像素桌宠入口
+- ✅ 菜单栏图标（显示 / 检查更新 / 完全退出）
+- ✅ App 内更新（下载进度、SHA-256 校验、原子替换、失败回滚）
 - 🚧 Windows 适配（代码已完成，待真机首次编译验证）
 - ⏳ AI 分类、标签、摘要、语义搜索（基于 `capture:id`）
 - ⏳ Apple Developer ID 签名与公证，免去首次打开提示
