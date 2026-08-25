@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
+import '../models/app_release.dart';
+
 /// Vault 路径等设置的持久化。
 ///
 /// 原生层负责平台持久化；Vault 是否仍然存在由这里统一验证。
@@ -32,18 +34,40 @@ class SettingsService {
   /// 返回选中的绝对路径，取消时返回 null。
   Future<String?> pickFolder() => _channel.invokeMethod<String>('pickFolder');
 
+  Future<AppVersion> getAppVersion() async {
+    final value = await _channel.invokeMethod<String>('getAppVersion');
+    if (value == null || value.trim().isEmpty) {
+      throw const FormatException('Native app version is missing');
+    }
+    return AppVersion.parse(value);
+  }
+
+  Future<void> showWindow() => _channel.invokeMethod('showWindow');
+
   /// 调整悬浮窗口尺寸（未配置 Vault 时放大显示引导）。
   /// [animate] 为 false 时即时切换（无动画），用于首帧/视图切换避免尺寸错配。
-  Future<void> setWindowSize(double width, double height, {bool animate = true}) =>
-      _channel.invokeMethod('setWindowSize', {
-        'width': width,
-        'height': height,
-        'animate': animate,
-      });
+  Future<void> setWindowSize(
+    double width,
+    double height, {
+    bool animate = true,
+  }) => _channel.invokeMethod('setWindowSize', {
+    'width': width,
+    'height': height,
+    'animate': animate,
+  });
 
   /// 按 Flutter 逻辑像素移动原生桌面窗口。
   Future<void> moveWindowBy(double dx, double dy) =>
       _channel.invokeMethod('moveWindowBy', {'dx': dx, 'dy': dy});
+
+  Future<void> beginWindowDrag() => _channel.invokeMethod('beginWindowDrag');
+
+  Future<void> updateWindowDrag() => _channel.invokeMethod('updateWindowDrag');
+
+  Future<void> endWindowDrag() => _channel.invokeMethod('endWindowDrag');
+
+  Future<void> installUpdate(String dmgPath) =>
+      _channel.invokeMethod('installUpdate', {'dmgPath': dmgPath});
 
   /// 退出应用。
   Future<void> quit() => _channel.invokeMethod('quit');

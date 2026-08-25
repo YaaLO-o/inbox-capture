@@ -3,6 +3,16 @@ import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate {
+  private var statusMenuController: StatusMenuController?
+
+  override func applicationDidFinishLaunching(_ notification: Notification) {
+    super.applicationDidFinishLaunching(notification)
+
+    statusMenuController = StatusMenuController { [weak self] action in
+      self?.handleStatusMenuAction(action)
+    }
+  }
+
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
     // 悬浮入口关闭不应直接退出应用；通过菜单或退出按钮结束。
     return false
@@ -21,6 +31,29 @@ class AppDelegate: FlutterAppDelegate {
 
   override func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
     return true
+  }
+
+  private func handleStatusMenuAction(_ action: StatusMenuAction) {
+    switch action {
+    case .showWindow:
+      mainFlutterWindow?.makeKeyAndOrderFront(nil)
+      NSApp.activate(ignoringOtherApps: true)
+    case .checkForUpdates:
+      sendCommand("checkForUpdates")
+      mainFlutterWindow?.makeKeyAndOrderFront(nil)
+      NSApp.activate(ignoringOtherApps: true)
+    case .quit:
+      NSApp.terminate(nil)
+    }
+  }
+
+  private func sendCommand(_ method: String) {
+    guard let controller = mainFlutterWindow?.contentViewController as? FlutterViewController else { return }
+    let channel = FlutterMethodChannel(
+      name: "com.inbox.app/commands",
+      binaryMessenger: controller.engine.binaryMessenger
+    )
+    channel.invokeMethod(method, arguments: nil)
   }
 }
 
@@ -101,6 +134,7 @@ enum ClipboardChannel {
 enum SettingsChannel {
   static let channelName = "com.inbox.app/settings"
   private static let vaultKey = "vaultPath"
+  private static var windowDragSession: WindowDragSession?
 
   static func register(with controller: FlutterViewController) {
     let channel = FlutterMethodChannel(name: channelName, binaryMessenger: controller.engine.binaryMessenger)
@@ -120,6 +154,17 @@ enum SettingsChannel {
         result(nil)
       case "pickFolder":
         result(pickFolder())
+      case "getAppVersion":
+        if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+           !version.isEmpty {
+          result(version)
+        } else {
+          result(FlutterError(code: "MISSING_VERSION", message: "CFBundleShortVersionString is missing", details: nil))
+        }
+      case "showWindow":
+        controller.view.window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        result(nil)
       case "setWindowSize":
         guard let args = call.arguments as? [String: Any],
               let w = args["width"] as? Double,
@@ -138,6 +183,41 @@ enum SettingsChannel {
         }
         moveWindowBy(controller: controller, dx: dx, dy: dy)
         result(nil)
+      case "beginWindowDrag":
+        beginWindowDrag(controller: controller)
+        result(nil)
+      case "updateWindowDrag":
+        updateWindowDrag(controller: controller)
+        result(nil)
+      case "endWindowDrag":
+        endWindowDrag()
+        result(nil)
+      case "installUpdate":
+        guard let args = call.arguments as? [String: Any],
+              let dmgPath = args["dmgPath"] as? String,
+              !dmgPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+          result(FlutterError(code: "BAD_ARGS", message: "installUpdate 需要 dmgPath", details: nil))
+          return
+        }
+        let dmgURL = URL(fileURLWithPath: dmgPath)
+        UpdateInstaller.prepare(dmgPath: dmgPath) { installResult in
+          // 无论成功失败，清理下载的临时 DMG 及其目录
+          let tmpDir = dmgURL.deletingLastPathComponent()
+          if tmpDir.lastPathComponent.hasPrefix("inbox-update_") {
+            try? FileManager.default.removeItem(at: tmpDir)
+          } else {
+            try? FileManager.default.removeItem(at: dmgURL)
+          }
+          switch installResult {
+          case .success:
+            result(nil)
+            DispatchQueue.main.async {
+              NSApp.terminate(nil)
+            }
+          case .failure(let error):
+            result(FlutterError(code: error.flutterCode, message: error.message, details: nil))
+          }
+        }
       case "quit":
         NSApp.terminate(nil)
         result(nil)
@@ -181,6 +261,27 @@ enum SettingsChannel {
       x: window.frame.origin.x + CGFloat(dx),
       y: window.frame.origin.y - CGFloat(dy)
     ))
+  }
+
+  private static func beginWindowDrag(controller: FlutterViewController) {
+    guard let window = controller.view.window else {
+      windowDragSession = nil
+      return
+    }
+    windowDragSession = WindowDragSession(
+      mouseOrigin: NSEvent.mouseLocation,
+      windowOrigin: window.frame.origin
+    )
+  }
+
+  private static func updateWindowDrag(controller: FlutterViewController) {
+    guard let window = controller.view.window,
+          let session = windowDragSession else { return }
+    window.setFrameOrigin(session.origin(for: NSEvent.mouseLocation))
+  }
+
+  private static func endWindowDrag() {
+    windowDragSession = nil
   }
 
   private static func pickFolder() -> String? {

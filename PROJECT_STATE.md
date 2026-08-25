@@ -1,10 +1,10 @@
 # Project State
 
-更新时间：2026-08-24
+更新时间　2026-08-25
 
 ## 当前阶段
 
-V0.1（Mac Capture MVP）已完成。`app/` 是唯一正式主工程，包含 macOS 和 Windows target；旧 Electron Windows 客户端已降级到 `legacy/electron-windows/`，只作为迁移参考。桌面入口已从悬浮胶囊改为像素宝箱怪桌宠。
+V0.1（Mac Capture MVP）已完成，macOS 生命周期与应用内更新已完成 1.1.1 本地发布准备和预发布验证。`app/` 是唯一正式主工程，包含 macOS 和 Windows target；旧 Electron Windows 客户端已降级到 `legacy/electron-windows/`，只作为迁移参考。桌面入口已从悬浮胶囊改为像素宝箱怪桌宠。
 
 macOS Release App 已完成本机安装验证。正式应用名为 `INbox`，Bundle Identifier 保持 `com.inbox.inboxApp`，安装位置为 `/Applications/INbox.app`；可从 Applications 或 Spotlight 启动，运行后继续保持 LSUIElement 桌面悬浮助手模式。再次从 Applications 或 Spotlight 打开已运行的 INbox 时，AppDelegate 会重新显示悬浮窗。安装脚本会注销并归档 build 目录中的同名 `.app` 产物，避免开发产物污染 Spotlight 搜索结果。
 
@@ -44,6 +44,7 @@ Shared Flutter app
 - Vault 路径持久化与清理
 - 窗口尺寸和位置
 - 应用退出
+- 原生 bundle 版本读取和 macOS 更新安装
 
 ## MethodChannel contract
 
@@ -58,9 +59,18 @@ com.inbox.app/settings
   setVaultPath(path)
   clearVaultPath
   pickFolder
-  setWindowSize(width, height)
+  getAppVersion
+  showWindow
+  setWindowSize(width, height, animate)
   moveWindowBy(dx, dy)
+  beginWindowDrag
+  updateWindowDrag
+  endWindowDrag
+  installUpdate(dmgPath)
   quit
+
+com.inbox.app/commands
+  checkForUpdates
 ```
 
 macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows 使用 Win32 Clipboard、CF_HDROP、Registry、IFileDialog 和原生窗口 API。
@@ -98,6 +108,8 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 - 本地文件优先于同一剪贴板对象的 bitmap
 - 像素宝箱怪桌宠作为桌面入口：整个箱体可拖拽，点击触发 Capture，带 idle/capturing/success/empty/error 动画与 golden 测试
 - 右键弹出浅色快捷菜单（重新选择 Vault / 退出 INbox），不跟随系统 Dark Mode
+- 更新界面显示检查、下载进度、本机校验、安装与保留旧版的状态
+- 当前版本来自原生 `CFBundleShortVersionString`，不在 Dart 中另设版本常量
 
 ### macOS adapter
 
@@ -106,6 +118,10 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 - Finder 文件存在时不再读取重复图片 bytes
 - UserDefaults、NSOpenPanel、窗口缩放/移动、置顶和跨空间
 - LSUIElement/accessory 模式隐藏 Dock 图标
+- macOS 菜单栏提供「显示 INbox」、「检查更新」和「完全退出」
+- 点红色关闭按钮后保持进程，可从菜单栏或 Applications 重新显示
+- 更新包校验通过后由本地 helper 替换 `/Applications/INbox.app`，失败时保留或回滚到旧版
+- 只有用户点「检查更新」或主动运行安装脚本时才联系 GitHub
 
 ### Windows adapter
 
@@ -121,7 +137,7 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 
 ## 自动化测试
 
-当前 Flutter 测试共 66 项，覆盖：
+当前 Flutter 测试共 85 项，覆盖：
 
 - 统一目录和 attachment 引用
 - macOS/Windows 标记输入生成相同 Markdown
@@ -137,8 +153,31 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 - 像素宝箱怪桌宠：动画 manifest、sprite 渲染、点击/拖拽/右键、success/empty/error、reduced-motion、golden
 - 右键快捷菜单：显示/关闭、点击外部关闭、菜单项功能
 - 窗口透明 surface 与首次引导中的统一目录说明
+- 更新界面的当前版本判定、新版提示、下载进度和错误保护
+- macOS 菜单栏动作、窗口绝对指针拖动、更新安装路径和 helper 环境清理
+- 安装与替换脚本的进程防护、路径校验、替换和回滚
 
 旧 Electron 11 项 Node 测试仍保留在 legacy 目录并通过，但不再作为正式客户端验收项。
+
+## 1.1.1 本地预发布验证
+
+2026-08-25 在 macOS 开发机和含中文字符的工作区路径下完成。
+
+```text
+flutter pub get                 通过
+dart analyze lib test           No issues found
+flutter test                    85/85 通过
+xcodebuild test                 5/5 RunnerTests 通过
+sh -n                           安装、发布和替换脚本通过
+replace_macos_app_test.sh       通过
+install_sh_test.sh              7/7 通过
+release_macos_test.sh           4/4 通过
+release_macos.sh 1.1.1          通过
+```
+
+新构建的 app bundle 版本为 `1.1.1`，build 为 `2`，二进制同时包含 `x86_64` 和 `arm64`。两个 DMG 均为 `17682577` 字节，SHA-256 均为 `2e5189e7c894c404725ddcc1c32a8fbef11795be43ffdecde4ab2e9c7ce13425`，通过 `cmp` 字节比较和 `hdiutil verify`。
+
+本轮没有把应用安装到 `/Applications`，也没有推送、打 tag、上传资产或修改 GitHub Release。精确安装路径、真实断网、更新回滚与安装后交互仍需在授权后手动验收。
 
 ## V0.1 本机验证
 
@@ -174,7 +213,7 @@ flutter build windows
 - 必须真机测试 Windows 文字、PNG/JPEG、bitmap、Explorer 文件、目录选择、重启恢复、拖动、右键菜单与退出。
 - 需要在真实 Obsidian 中验证图片 embed 与普通文件链接显示。
 - macOS App Sandbox 仍关闭；重新启用需要 security-scoped bookmark。
-- DMG/PKG、Developer ID、公证、开机启动和公开发布流程不在当前范围。
+- Developer ID、公证、开机启动和公开发布仍是后续工作。本地可以生成 Universal DMG，但未经明确授权不会推送、打 tag 或修改 GitHub Release。
 
 ## 运行方式
 
@@ -189,6 +228,9 @@ flutter run -d macos
 # 返回仓库根目录后，重新构建并安装本机 Release App
 cd ..
 ./scripts/install_macos.sh
+
+# 在仓库根目录构建 1.1.1 Universal DMG
+sh scripts/release_macos.sh 1.1.1
 ```
 
 日常使用时直接在 Applications 双击 `INbox`，或通过 Spotlight 搜索 `INbox`。正式安装路径是 `/Applications/INbox.app`。

@@ -3,19 +3,24 @@
 # 构建 INbox macOS Release 并打包成可拖入 /Applications 的 DMG。
 #
 # 用法：
-#   sh scripts/release_macos.sh [version]
+#   sh scripts/release_macos.sh <version>
 #
 # 产物：
 #   dist/INbox-<version>-macos-universal.dmg
 #
 # 说明：
-# - flutter build macos --release 默认产出 universal binary（arm64 + x86_64）。
+# - 脚本校验构建版本与 universal binary（arm64 + x86_64）。
 # - 当前未使用 Apple Developer ID，app 仅 ad-hoc 签名；首次打开会被 Gatekeeper
 #   拦截，详见 .github/DOWNLOAD.md。
 
 set -eu
 
-VERSION=${1:-0.1.0}
+if [ "$#" -ne 1 ] || [ -z "$1" ]; then
+  echo "Usage: sh scripts/release_macos.sh <version>" >&2
+  exit 64
+fi
+
+VERSION=$1
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_DIR=$(dirname "$SCRIPT_DIR")
@@ -36,12 +41,34 @@ echo "==> flutter pub get"
 (cd "$APP_DIR" && flutter pub get >/dev/null)
 
 echo "==> flutter build macos --release (universal)"
-(cd "$APP_DIR" && flutter build macos --release)
+(cd "$APP_DIR" && flutter build macos --release --build-name "$VERSION" --build-number 2)
 
 if [ ! -d "$RELEASE_APP" ]; then
   echo "Release app not found after build: $RELEASE_APP" >&2
   exit 1
 fi
+
+BUNDLE_VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$RELEASE_APP/Contents/Info.plist")
+if [ "$BUNDLE_VERSION" != "$VERSION" ]; then
+  echo "Bundle version mismatch: expected $VERSION, found $BUNDLE_VERSION" >&2
+  exit 1
+fi
+
+ARCHS=$(lipo -archs "$RELEASE_APP/Contents/MacOS/${APP_NAME}")
+case " $ARCHS " in
+  *" arm64 "*) ;;
+  *)
+    echo "Release binary is missing arm64: $ARCHS" >&2
+    exit 1
+    ;;
+esac
+case " $ARCHS " in
+  *" x86_64 "*) ;;
+  *)
+    echo "Release binary is missing x86_64: $ARCHS" >&2
+    exit 1
+    ;;
+esac
 
 echo "==> ad-hoc codesign (兜底，未使用 Developer ID)"
 # --deep 已弃用但仍可用；Flutter 内嵌 framework 默认已签名，这里强制统一。
@@ -96,7 +123,6 @@ LATEST_DMG="$DIST_DIR/${APP_NAME}-macos-universal.dmg"
 /bin/cp -f "$DMG_PATH" "$LATEST_DMG"
 
 # 架构与校验信息
-ARCHS=$(lipo -archs "$RELEASE_APP/Contents/MacOS/${APP_NAME}" 2>/dev/null || echo "unknown")
 SIZE=$(du -h "$DMG_PATH" | cut -f1)
 SHA256=$(shasum -a 256 "$DMG_PATH" | cut -d' ' -f1)
 

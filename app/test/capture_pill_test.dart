@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -38,6 +39,18 @@ void main() {
   tearDown(() {
     messenger.setMockMethodCallHandler(settingsChannel, null);
   });
+
+  Future<void> withTestPlatform(
+    TargetPlatform platform,
+    Future<void> Function() body,
+  ) async {
+    debugDefaultTargetPlatformOverride = platform;
+    try {
+      await body();
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  }
 
   Future<void> pumpPill(
     WidgetTester tester, {
@@ -83,26 +96,55 @@ void main() {
     expect(capture.calls, 1);
   });
 
-  testWidgets('拖动只通过共享设置通道移动原生窗口', (tester) async {
-    final calls = <MethodCall>[];
-    messenger.setMockMethodCallHandler(settingsChannel, (call) async {
-      calls.add(call);
-      return null;
+  testWidgets('macOS 拖动走原生绝对坐标会话且不触发 Capture', (tester) async {
+    await withTestPlatform(TargetPlatform.macOS, () async {
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(settingsChannel, (call) async {
+        calls.add(call);
+        return null;
+      });
+      final capture = FakeCaptureService(
+        const CaptureResult(CaptureStatus.saved),
+      );
+      await pumpPill(tester, capture: capture);
+
+      await tester.drag(
+        find.byKey(const Key('pet-visible-region')),
+        const Offset(30, 20),
+      );
+      await tester.pump();
+
+      expect(calls.map((call) => call.method), [
+        'beginWindowDrag',
+        'updateWindowDrag',
+        'endWindowDrag',
+      ]);
+      expect(capture.calls, 0);
     });
-    final capture = FakeCaptureService(
-      const CaptureResult(CaptureStatus.saved),
-    );
-    await pumpPill(tester, capture: capture);
+  });
 
-    await tester.drag(
-      find.byKey(const Key('pet-visible-region')),
-      const Offset(30, 20),
-    );
-    await tester.pump();
+  testWidgets('Windows 拖动继续使用 moveWindowBy 回退', (tester) async {
+    await withTestPlatform(TargetPlatform.windows, () async {
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(settingsChannel, (call) async {
+        calls.add(call);
+        return null;
+      });
+      final capture = FakeCaptureService(
+        const CaptureResult(CaptureStatus.saved),
+      );
+      await pumpPill(tester, capture: capture);
 
-    expect(calls, isNotEmpty);
-    expect(calls.every((call) => call.method == 'moveWindowBy'), isTrue);
-    expect(capture.calls, 0);
+      await tester.drag(
+        find.byKey(const Key('pet-visible-region')),
+        const Offset(30, 20),
+      );
+      await tester.pump();
+
+      expect(calls, isNotEmpty);
+      expect(calls.every((call) => call.method == 'moveWindowBy'), isTrue);
+      expect(capture.calls, 0);
+    });
   });
 
   testWidgets('右键显示 Vault 和退出菜单且不执行 Capture', (tester) async {

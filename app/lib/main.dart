@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
+import 'models/app_release.dart';
+import 'services/app_command_service.dart';
 import 'services/capture_service.dart';
 import 'services/clipboard_service.dart';
 import 'services/settings_service.dart';
 import 'services/storage_service.dart';
+import 'services/update_service.dart';
 import 'ui/capture_pill.dart';
 import 'ui/onboarding_view.dart';
+import 'ui/update_view.dart';
 import 'ui/window_sizes.dart';
 
 void main() {
@@ -14,27 +18,50 @@ void main() {
 }
 
 class InboxApp extends StatefulWidget {
-  const InboxApp({super.key});
+  final SettingsService? settings;
+  final UpdateService? updateService;
+  final AppCommandService? commandService;
+
+  const InboxApp({
+    super.key,
+    this.settings,
+    this.updateService,
+    this.commandService,
+  });
 
   @override
   State<InboxApp> createState() => _InboxAppState();
 }
 
 class _InboxAppState extends State<InboxApp> {
-  final SettingsService _settings = SettingsService();
+  late final SettingsService _settings;
   late final CaptureService _capture;
+  late final UpdateService _updates;
+  late final AppCommandService _commands;
 
   String? _vaultPath;
+  AppVersion? _currentVersion;
   bool _loading = true;
+  bool _showingUpdate = false;
 
   @override
   void initState() {
     super.initState();
+    _settings = widget.settings ?? SettingsService();
+    _updates = widget.updateService ?? UpdateService();
+    _commands = widget.commandService ?? AppCommandService();
     _capture = CaptureService(
       clipboard: ClipboardService(),
       storage: StorageService(),
     );
+    _commands.start(onCheckForUpdates: _showUpdates);
     _boot();
+  }
+
+  @override
+  void dispose() {
+    _commands.dispose();
+    super.dispose();
   }
 
   Future<void> _boot() async {
@@ -78,12 +105,68 @@ class _InboxAppState extends State<InboxApp> {
     }
   }
 
+  Future<void> _showUpdates() async {
+    await _settings.showWindow();
+    await _settings.setWindowSize(
+      WindowSizes.updateWidth,
+      WindowSizes.updateHeight,
+      animate: false,
+    );
+    final version = await _settings.getAppVersion();
+    if (!mounted) return;
+    setState(() {
+      _currentVersion = version;
+      _showingUpdate = true;
+    });
+  }
+
+  Future<void> _closeUpdates() async {
+    setState(() {
+      _showingUpdate = false;
+      _currentVersion = null;
+    });
+
+    final path = _vaultPath;
+    if (path != null) {
+      await _settings.setWindowSize(
+        WindowSizes.pillWidth,
+        WindowSizes.pillHeight,
+        animate: false,
+      );
+    } else {
+      await _settings.setWindowSize(
+        WindowSizes.onboardingWidth,
+        WindowSizes.onboardingHeight,
+        animate: false,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
       return const MaterialApp(
         debugShowCheckedModeBanner: false,
         home: Scaffold(backgroundColor: Color(0xFF1E1E24)),
+      );
+    }
+
+    final currentVersion = _currentVersion;
+    if (_showingUpdate && currentVersion != null) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          brightness: Brightness.dark,
+          useMaterial3: true,
+          colorSchemeSeed: const Color(0xFF43C6AC),
+          fontFamily: '.AppleSystemUIFont',
+        ),
+        home: UpdateView(
+          currentVersion: currentVersion,
+          service: _updates,
+          installer: _settings.installUpdate,
+          onClose: _closeUpdates,
+        ),
       );
     }
 

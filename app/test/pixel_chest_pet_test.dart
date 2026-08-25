@@ -16,7 +16,11 @@ void main() {
     required Future<CaptureResult> Function() onCapture,
     bool disableAnimations = false,
     TargetPlatform platform = TargetPlatform.macOS,
+    ValueChanged<Offset>? onMove,
     ValueChanged<Offset>? onSecondaryTap,
+    VoidCallback? onDragStart,
+    VoidCallback? onDragUpdate,
+    VoidCallback? onDragEnd,
   }) async {
     final image = (await tester.runAsync(
       () => loadPixelChestAtlas(rootBundle),
@@ -30,8 +34,11 @@ void main() {
           child: PixelChestPet(
             atlas: image,
             onCapture: onCapture,
-            onMove: (_) {},
+            onMove: onMove ?? (_) {},
             onSecondaryTap: onSecondaryTap ?? (_) {},
+            onDragStart: onDragStart,
+            onDragUpdate: onDragUpdate,
+            onDragEnd: onDragEnd,
           ),
         ),
       ),
@@ -303,32 +310,52 @@ void main() {
   testWidgets('dragging the pet body moves without triggering capture', (
     tester,
   ) async {
-    final image = (await tester.runAsync(
-      () => loadPixelChestAtlas(rootBundle),
-    ))!;
     var captures = 0;
-    final moves = <Offset>[];
-    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
-    await tester.pumpWidget(
-      MaterialApp(
-        home: PixelChestPet(
-          atlas: image,
-          onCapture: () async {
-            captures += 1;
-            return const CaptureResult(CaptureStatus.saved);
-          },
-          onMove: moves.add,
-          onSecondaryTap: (_) {},
-        ),
-      ),
+    final events = <String>[];
+    await pumpPet(
+      tester,
+      onCapture: () async {
+        captures += 1;
+        return const CaptureResult(CaptureStatus.saved);
+      },
+      onMove: (_) => events.add('fallback'),
+      onDragStart: () => events.add('start'),
+      onDragUpdate: () => events.add('update'),
+      onDragEnd: () => events.add('end'),
     );
 
     await tester.drag(
       find.byKey(const Key('pet-visible-region')),
       const Offset(30, 20),
     );
-    expect(moves, isNotEmpty);
+    expect(events.first, 'start');
+    expect(events, contains('update'));
+    expect(events.last, 'end');
+    expect(events, isNot(contains('fallback')));
     expect(captures, 0);
+  });
+
+  testWidgets('cancelled drag still emits end exactly once', (tester) async {
+    final events = <String>[];
+    await pumpPet(
+      tester,
+      onCapture: () async => const CaptureResult(CaptureStatus.saved),
+      onDragStart: () => events.add('start'),
+      onDragUpdate: () => events.add('update'),
+      onDragEnd: () => events.add('end'),
+    );
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(const Key('pet-visible-region'))),
+    );
+    await gesture.moveBy(const Offset(30, 20));
+    await tester.pump();
+    await gesture.cancel();
+    await tester.pump();
+
+    expect(events.first, 'start');
+    expect(events.where((event) => event == 'end'), hasLength(1));
+    expect(events.last, 'end');
   });
 
   testWidgets('right click reports its global position without capture', (

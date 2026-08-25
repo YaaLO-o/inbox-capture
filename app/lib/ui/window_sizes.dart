@@ -7,4 +7,8 @@ class WindowSizes {
   /// 未配置 Vault：放大显示选择引导。
   static const onboardingWidth = 420.0;
   static const onboardingHeight = 300.0;
+
+  /// 菜单触发更新：显示检查、下载与安装进度。
+  static const updateWidth = 420.0;
+  static const updateHeight = 300.0;
 }
