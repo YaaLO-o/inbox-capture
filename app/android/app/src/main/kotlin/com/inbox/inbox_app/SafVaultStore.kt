@@ -103,10 +103,7 @@ class SafVaultStore(private val context: Context) {
             }
             return existing.file
         }
-        DocumentsContract.createDocument(contentResolver, parent.uri, mimeType, fileName)
-            ?: throw IOException("Could not create $fileName")
-        val created = exactChild(parent, fileName, expectedMimeType)
-            ?: throw IOException("Provider did not create exact file $fileName")
+        val created = createExactChild(parent, mimeType, fileName, expectedMimeType)
         if (created.mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
             throw IOException("$fileName is a directory")
         }
@@ -124,23 +121,52 @@ class SafVaultStore(private val context: Context) {
             }
             return existing.file
         }
-        DocumentsContract.createDocument(
-            contentResolver,
-            parent.uri,
-            DocumentsContract.Document.MIME_TYPE_DIR,
-            displayName,
-        )
-            ?: throw IOException("Could not create directory $displayName")
-        val created = exactChild(
+        val created = createExactChild(
             parent,
+            DocumentsContract.Document.MIME_TYPE_DIR,
             displayName,
             DocumentsContract.Document.MIME_TYPE_DIR,
         )
-            ?: throw IOException("Provider did not create exact directory $displayName")
         if (created.mimeType != DocumentsContract.Document.MIME_TYPE_DIR) {
             throw IOException("$displayName is not a directory")
         }
         return created.file
+    }
+
+    private fun createExactChild(
+        parent: DocumentFile,
+        mimeType: String,
+        displayName: String,
+        expectedMimeType: String,
+    ): ChildDocument {
+        val createdUri = DocumentsContract.createDocument(
+            contentResolver,
+            parent.uri,
+            mimeType,
+            displayName,
+        ) ?: throw IOException("Could not create $displayName")
+        // Re-query the child by exact display name rather than trusting
+        // DocumentFile.fromSingleUri(createdUri), whose name/type can be null on
+        // some providers (e.g. test/stub providers and certain OEM builds).
+        // exactChild enumerates children and, on external storage, falls back to
+        // the deterministic document id, so it reliably detects when the provider
+        // honored the requested name versus minting a "name (N)" variant.
+        val exact = exactChild(parent, displayName, expectedMimeType)
+        if (exact != null) {
+            // A concurrent create could have produced a duplicate at createdUri;
+            // remove it if it is not the exact document we are returning.
+            if (exact.file.uri != createdUri) {
+                runCatching { DocumentsContract.deleteDocument(contentResolver, createdUri) }
+            }
+            return exact
+        }
+        val deleted = runCatching {
+            DocumentsContract.deleteDocument(contentResolver, createdUri)
+        }.getOrDefault(false)
+        if (!deleted) {
+            throw IOException("Provider created non-exact $displayName and cleanup failed")
+        }
+        throw IOException("Provider did not create exact child $displayName")
     }
 
     private fun exactChild(
