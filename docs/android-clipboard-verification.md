@@ -16,9 +16,10 @@ Task 8 focused clipboard probe. The Activity is translucent, `noHistory`, and no
 | Direct shell launch | Correctly denied by Android with `Permission Denial ... not exported` |
 | App-UID `run-as` launch | Also denied. Exact error: `Permission Denial: package=com.android.shell does not belong to uid=10254`; `run-as` keeps the shell caller identity for ActivityManager on this API 36 image |
 | Automated probe checks | 3 focused JVM tests passed: focus-gated exact-once read, blank/empty finish, bridge result/finish-once |
+| Android test harness | `connectedDebugAndroidTest` passed 27 tests with the manual harness skipped by default; explicit instrumentation invocation ran the real Activity once and passed |
 | Exact Markdown write | Not exercised from shell: no exported test launcher and no configured emulator Vault/clipboard injection path was used |
 | Visible source UI | Chrome was brought to the foreground and a known string was entered and copied through the visible address-bar UI |
-| Probe log inspection | No production probe log was generated because both shell and `run-as` ActivityManager launches were rejected |
+| Explicit harness probe logs | `start`, `focus`, `clip count=0`, `non-empty=false`, `bridge status=empty`; Activity exited. The attempted visible Chrome copy did not leave text in the emulator clipboard, so no exact Markdown save was claimed |
 
 The non-exported Activity must be launched by the in-app overlay entrypoint in the later task or by an instrumented app-owned test. No exported/debug workaround was added.
 
@@ -51,3 +52,13 @@ At the final gate check, `adb devices -l` showed only `emulator-5554`; the Xiaom
 | 15 | Other content app | 5 |  |  |  |  |
 
 Pass criterion remains at least 14/15 exact saves, no hang, and no navigation to full settings.
+
+Repeatable app-owned harness command after installing both APKs without clearing app data:
+
+```sh
+adb shell am instrument -w \
+  -e class com.inbox.inbox_app.ManualClipboardProbeTest \
+  -e manualClipboardProbe true \
+  com.inbox.inbox_app.test/androidx.test.runner.AndroidJUnitRunner
+adb logcat -d -s INboxClipboardProbe:D '*:S'
+```
