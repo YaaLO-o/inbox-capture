@@ -183,7 +183,11 @@ class SafVaultStoreTest {
             store.ensureLayout(treeUri)
         }
         assertNull(child(rootDocumentUri, "Universal Capture"))
-        assertTrue(childNames(rootDocumentUri).contains("Universal Capture (1)"))
+        assertTrue(
+            childNames(rootDocumentUri).none {
+                it.startsWith("Universal Capture (")
+            },
+        )
     }
 
     private fun child(parent: Uri, displayName: String): Uri? {
