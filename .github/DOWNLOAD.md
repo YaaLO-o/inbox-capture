@@ -28,7 +28,7 @@ curl -fsSL https://raw.githubusercontent.com/YaaLO-o/inbox-capture/main/scripts/
 
 ### 3. 首次打开（重要）
 
-当前版本**尚未购买 Apple Developer ID 进行签名和公证**，应用完全在本地运行、不联网，但 macOS 的 Gatekeeper 第一次会拦截。按下面任意一种方式放行即可：
+当前版本**尚未购买 Apple Developer ID 进行签名和公证**。采集和本地存储完全在本机完成，只有用户点「检查更新」或主动运行安装命令时才会联系 GitHub。macOS 的 Gatekeeper 第一次会拦截，按下面任意一种方式放行即可。
 
 **方式 A：右键打开（最简单）**
 

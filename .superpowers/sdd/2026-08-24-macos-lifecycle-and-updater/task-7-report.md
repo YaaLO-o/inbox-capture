@@ -126,10 +126,10 @@ The build-tree app was launched with Computer Use. It was not copied to `/Applic
 | --- | --- |
 | Pointer-accurate drag | Partial. A visible pet drag was exercised without triggering capture. Exact absolute screen-delta behavior is covered by passing Flutter and Runner tests, but the Computer Use capture does not expose post-drag window coordinates. |
 | Visible traffic lights | Pass. The build-tree window visibly showed red, yellow, and green controls; the accessibility tree exposed close, minimize, and zoom buttons. |
-| Red-close plus menu reopen | Partial. Red-close interaction left the process available and reacquiring the app showed the window. The status-item menu itself was not exposed to Computer Use, so the exact `显示 INbox` click remains manual; action dispatch passed XCTest. |
-| Complete quit | Partial. Command-Q ended the build-tree process and a fresh `pgrep` returned no match. The exact status-item `完全退出` click remains manual; action dispatch passed XCTest. |
+| Red-close plus menu reopen | Partial. Computer Use clicked the real red close button; a separate host-window capture no longer showed the floating INbox window while exact Release PID `20042` remained alive. Computer Use could not expose or reliably select the NSStatusItem, so the exact `显示 INbox` action remains an unresolved manual risk. |
+| Complete quit | Manual gap. Computer Use could not expose or reliably select the NSStatusItem, so the exact `完全退出` action remains unresolved. Command-Q was used only to clean up the isolated test process; a subsequent exact-path `pgrep` returned no match. |
 | Current-version update UI | Automated pass, manual gap. Widget tests prove current `1.1.1` plus remote `1.1.1` is current and remote `1.1.2` is newer. No public 1.1.1 Release was created, so a deterministic live equal-version UI check was not performed. |
-| Offline safety | Automated pass, manual gap. Update error UI, failed checksum retention, installer failure, and rollback fixtures pass. System networking was not disabled for a live GUI check. |
+| Offline safety | Automated pass, unresolved live risk. Update error UI, failed checksum retention, installer failure, and rollback fixtures pass. A live check would require disconnecting or intercepting the user's network, so no system-wide network state was changed. |
 | Exact installed launch path | Automated pass, manual gap. Path and open-command fixtures require `/Applications/INbox.app`; no installed app exists and the task forbids installing over `/Applications`. |
 | Rollback behavior | Automated pass, manual gap. Both replacement test suites cover failed replacement and restoration. A real `/Applications` failure was intentionally not induced. |
 
@@ -158,15 +158,61 @@ No Task 7 production edit was needed in `app/lib/ui/update_view.dart` or `app/ma
 
 ## Concerns
 
-- Manual status-menu, real offline, real installed-path, and real rollback acceptance remain open by design because this task forbids installing over `/Applications` and forbids publishing 1.1.1.
+- The exact status-menu `显示 INbox` and `完全退出` actions remain an unresolved release risk because Computer Use does not expose the app's NSStatusItem.
+- Live offline behavior remains an unresolved release risk because testing it would require disconnecting or intercepting the user's network. No system-wide network state was changed.
+- Real installed-path and rollback acceptance remain open because this task forbids installing over `/Applications`.
 - `xcodebuild` passes but retains the pre-existing XCTest deployment-target linker warnings described above.
 - The final quiet `xcodebuild` rerun also reported stale Flutter framework files under another DerivedData directory as outside allowed roots. The command still exited 0 and all five tests passed; no repository or release artifact path was implicated.
 - Apple Developer ID signing and notarization remain outside this local release preparation.
 
-## Commit
+## Commits
 
-Planned commit message:
+- `d3c858c` `chore: prepare INbox 1.1.1` completed the tracked Task 7 release preparation.
+
+## Fix Round 1
+
+### Findings addressed
+
+- Scoped the Gatekeeper paragraph in `.github/DOWNLOAD.md` to local capture and storage, with the explicit GitHub contact exception for user-triggered update actions.
+- Repeated feasible lifecycle acceptance against the exact worktree Release app path without installing or replacing `/Applications/INbox.app`.
+- Corrected the manual-acceptance table and concerns so status-menu limits and offline limits are not attributed to publication restrictions.
+
+### Exact manual evidence
+
+The app target was:
 
 ```text
-chore: prepare INbox 1.1.1
+/Users/mac/Desktop/ai/个人/INbox/.worktrees/macos-lifecycle-updater/app/build/macos/Build/Products/Release/INbox.app
 ```
+
+- Before launch, exact-path `pgrep` returned no Release process.
+- Computer Use launched the full path; exact-path `pgrep` reported PID `20042` with the matching `Contents/MacOS/INbox` path.
+- Computer Use clicked the native red close button. A separate host-window capture showed no floating INbox window, while exact-path `pgrep` still reported PID `20042`. This verifies red close hid the window without terminating the process.
+- Computer Use did not expose the NSStatusItem in the app accessibility tree. Direct `SystemUIServer` inspection timed out, and keyboard status-menu focus could not identify the item reliably. No unidentified menu item was intentionally selected. The exact `显示 INbox` and `完全退出` clicks remain unresolved release risks.
+- Computer Use sent Command-Q only to the exact worktree Release app to clean up. Exact-path `pgrep` then returned no match.
+- `/Applications/INbox.app` remained absent throughout.
+- Live offline behavior remains unresolved because a truthful test would require disconnecting or intercepting the user's network. No network setting was changed.
+
+### Focused verification
+
+```bash
+rg -n '完全在本地运行|不联网|采集和本地存储|检查更新|联系 GitHub' .github/DOWNLOAD.md README.md
+rg -n 'd3c858c|Red-close plus menu reopen|Complete quit|Offline safety|unresolved release risk|Fix Round 1' .superpowers/sdd/2026-08-24-macos-lifecycle-and-updater/task-7-report.md
+sh -n scripts/release_macos.sh
+git diff --check
+```
+
+All four commands exited 0. The first scan found no remaining claim that the whole application never connects to the network; every network statement is scoped to local capture/storage or includes the explicit update exception. The report scan found completed commit `d3c858c` and the corrected acceptance risks, with no future-tense commit marker.
+
+Final process and install-path check:
+
+```text
+exact isolated Release process is absent
+/Applications/INbox.app remains absent
+```
+
+### Self-review
+
+- No application code, release script, artifact, `/Applications` path, or system network setting was changed in this fix round.
+- The public privacy wording now matches the explicit update behavior documented later on the same page.
+- Manual results distinguish verified red-close behavior, automated lifecycle coverage, and unresolved status-menu and live-offline risks.
