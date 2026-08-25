@@ -9,34 +9,87 @@ import java.util.UUID
 
 object AndroidCaptureBridge {
     private const val CHANNEL_NAME = "com.inbox.app/android_capture"
-    private const val QUEUED_TIMEOUT_MILLIS = 10_000L
-
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private val pending = mutableListOf<PendingRequest>()
-    private var channel: MethodChannel? = null
-    private var ready = false
+    private var coordinator: AndroidCaptureBridgeCoordinator? = null
 
     fun attach(messenger: BinaryMessenger) {
-        ready = false
-        channel = MethodChannel(messenger, CHANNEL_NAME).also {
-            it.setMethodCallHandler(::handleDartCall)
-        }
+        coordinator = AndroidCaptureBridgeCoordinator(
+            MethodChannel(messenger, CHANNEL_NAME),
+            AndroidMainCaptureScheduler(),
+            { UUID.randomUUID().toString() },
+        )
     }
 
     fun capture(
         arguments: Map<String, Any?>,
         callback: (Map<String, Any?>) -> Unit,
     ) {
-        val taskId = UUID.randomUUID().toString()
+        val attachedCoordinator = coordinator
+        if (attachedCoordinator == null) {
+            callback(
+                captureErrorResult(
+                    UUID.randomUUID().toString(),
+                    "Capture channel unavailable",
+                ),
+            )
+            return
+        }
+        attachedCoordinator.capture(arguments, callback)
+    }
+}
+
+internal fun interface ScheduledCaptureTask {
+    fun cancel()
+}
+
+internal interface CaptureScheduler {
+    fun runOnMain(action: () -> Unit)
+
+    fun schedule(delayMillis: Long, action: () -> Unit): ScheduledCaptureTask
+}
+
+private class AndroidMainCaptureScheduler : CaptureScheduler {
+    private val handler = Handler(Looper.getMainLooper())
+
+    override fun runOnMain(action: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            action()
+        } else {
+            handler.post(action)
+        }
+    }
+
+    override fun schedule(
+        delayMillis: Long,
+        action: () -> Unit,
+    ): ScheduledCaptureTask {
+        val runnable = Runnable(action)
+        handler.postDelayed(runnable, delayMillis)
+        return ScheduledCaptureTask { handler.removeCallbacks(runnable) }
+    }
+}
+
+internal class AndroidCaptureBridgeCoordinator(
+    private val channel: MethodChannel,
+    private val scheduler: CaptureScheduler,
+    private val taskIdGenerator: () -> String,
+) {
+    private val pending = mutableListOf<PendingRequest>()
+    private var ready = false
+
+    init {
+        channel.setMethodCallHandler(::handleDartCall)
+    }
+
+    fun capture(
+        arguments: Map<String, Any?>,
+        callback: (Map<String, Any?>) -> Unit,
+    ) {
+        val taskId = taskIdGenerator()
         val requestArguments = arguments.toMutableMap().apply {
             this["taskId"] = taskId
         }
         val request = PendingRequest(taskId, requestArguments, callback)
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            captureOnMain(request)
-        } else {
-            mainHandler.post { captureOnMain(request) }
-        }
+        scheduler.runOnMain { captureOnMain(request) }
     }
 
     private fun handleDartCall(call: MethodCall, result: MethodChannel.Result) {
@@ -50,7 +103,7 @@ object AndroidCaptureBridge {
         val queued = pending.toList()
         pending.clear()
         queued.forEach { request ->
-            mainHandler.removeCallbacks(request.timeout)
+            request.timeout?.cancel()
             send(request)
         }
     }
@@ -61,26 +114,22 @@ object AndroidCaptureBridge {
             return
         }
 
-        request.timeout = Runnable {
+        pending.add(request)
+        request.timeout = scheduler.schedule(QUEUED_TIMEOUT_MILLIS) {
             if (pending.remove(request)) {
                 request.complete(
-                    errorResult(request.taskId, "Capture core readiness timed out"),
+                    captureErrorResult(
+                        request.taskId,
+                        "Capture core readiness timed out",
+                    ),
                 )
             }
         }
-        pending.add(request)
-        mainHandler.postDelayed(request.timeout, QUEUED_TIMEOUT_MILLIS)
     }
 
     private fun send(request: PendingRequest) {
-        val attachedChannel = channel
-        if (attachedChannel == null) {
-            request.complete(errorResult(request.taskId, "Capture channel unavailable"))
-            return
-        }
-
         try {
-            attachedChannel.invokeMethod(
+            channel.invokeMethod(
                 "capture",
                 request.arguments,
                 object : MethodChannel.Result {
@@ -88,7 +137,10 @@ object AndroidCaptureBridge {
                         val response = result.toStringKeyMap()
                         if (response == null || response["taskId"] != request.taskId) {
                             request.complete(
-                                errorResult(request.taskId, "Invalid capture response"),
+                                captureErrorResult(
+                                    request.taskId,
+                                    "Invalid capture response",
+                                ),
                             )
                             return
                         }
@@ -101,30 +153,32 @@ object AndroidCaptureBridge {
                         errorDetails: Any?,
                     ) {
                         request.complete(
-                            errorResult(request.taskId, errorMessage ?: errorCode),
+                            captureErrorResult(
+                                request.taskId,
+                                errorMessage ?: errorCode,
+                            ),
                         )
                     }
 
                     override fun notImplemented() {
                         request.complete(
-                            errorResult(request.taskId, "Capture method unavailable"),
+                            captureErrorResult(
+                                request.taskId,
+                                "Capture method unavailable",
+                            ),
                         )
                     }
                 },
             )
         } catch (error: RuntimeException) {
             request.complete(
-                errorResult(request.taskId, error.message ?: "Capture channel failed"),
+                captureErrorResult(
+                    request.taskId,
+                    error.message ?: "Capture channel failed",
+                ),
             )
         }
     }
-
-    private fun errorResult(taskId: String, message: String): Map<String, Any?> =
-        mapOf(
-            "status" to "error",
-            "message" to message,
-            "taskId" to taskId,
-        )
 
     private fun Any?.toStringKeyMap(): Map<String, Any?>? {
         if (this !is Map<*, *>) return null
@@ -141,7 +195,7 @@ object AndroidCaptureBridge {
         val arguments: Map<String, Any?>,
         private val callback: (Map<String, Any?>) -> Unit,
     ) {
-        lateinit var timeout: Runnable
+        var timeout: ScheduledCaptureTask? = null
         private var completed = false
 
         fun complete(result: Map<String, Any?>) {
@@ -150,4 +204,18 @@ object AndroidCaptureBridge {
             callback(result)
         }
     }
+
+    private companion object {
+        const val QUEUED_TIMEOUT_MILLIS = 10_000L
+    }
 }
+
+private fun captureErrorResult(
+    taskId: String,
+    message: String,
+): Map<String, Any?> =
+    mapOf(
+        "status" to "error",
+        "message" to message,
+        "taskId" to taskId,
+    )
