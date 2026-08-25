@@ -57,9 +57,25 @@ class ClipboardCaptureActivity : Activity() {
             capture = AndroidCaptureBridge::capture,
             finish = { status ->
                 Log.d(TAG, "bridge status=$status")
+                forwardResultToOverlay(status)
                 finish()
             },
         )
+    }
+
+    private fun forwardResultToOverlay(status: String) {
+        if (!OverlayService.isRunning) return
+        try {
+            startService(
+                Intent(this, OverlayService::class.java)
+                    .setAction(OverlayService.ACTION_CAPTURE_RESULT)
+                    .putExtra("status", status),
+            )
+        } catch (t: Throwable) {
+            // The overlay may have stopped between the check and the send; this
+            // is a non-fatal UI hint and must never break the capture flow.
+            Log.w(TAG, "Failed to forward capture result to overlay", t)
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

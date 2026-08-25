@@ -2,4 +2,9 @@
     <string name="app_name">INbox</string>
     <string name="share_capture_success">Saved to INbox</string>
     <string name="share_capture_error">Could not save to INbox</string>
+    <string name="overlay_channel_name">INbox 悬浮 Capture</string>
+    <string name="overlay_channel_description">悬浮 Capture 运行状态</string>
+    <string name="overlay_notification_title">INbox 悬浮 Capture</string>
+    <string name="overlay_notification_text">点击悬浮球保存最新剪贴板</string>
+    <string name="overlay_notification_stop">停止悬浮球</string>
 </resources>

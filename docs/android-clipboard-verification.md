@@ -102,3 +102,62 @@ adb shell am instrument -w \
   com.inbox.inbox_app.test/androidx.test.runner.AndroidJUnitRunner
 adb logcat -d -s INboxClipboardProbe:D '*:S'
 ```
+
+## Task 9 overlay bubble (Xiaomi 13 Pro)
+
+Device: Xiaomi 13 Pro `nuwa` / `2210132C`, Android 16 (API 36), HyperOS `OS3.0.310.0.WMBCNXM`, build `BP2A.250605.031.A3`. APK installed via `adb -s 4f3ae808 install -r -t app/build/app/outputs/flutter-apk/app-debug.apk`.
+
+### Settings UI
+
+- App launches to `Vault` + `悬浮 Capture` + `权限` sections.
+- With the test Vault `测试` selected, both permission rows read `已授予`; the action button shows `停止悬浮球` when the service is running and `开启悬浮球` when stopped; status text shows `悬浮球运行中` / `悬浮球未开启`.
+- `dumpsys window windows` while running lists one `ty=APPLICATION_OVERLAY` window owned by `com.inbox.inbox_app`: `mAttrs={(954,1137)(126x126) ... fmt=TRANSLUCENT}` (126 px = 48 dp at 420 dpi touch container; the visible dot is 32 dp).
+- `dumpsys activity services com.inbox.inbox_app` lists `ServiceRecord{... .OverlayService}` with `isForeground=true foregroundId=4101 types=0x40000000` (`specialUse`) and `foregroundNoti=Notification(channel=inbox_overlay ... flags=ONGOING_EVENT|NO_CLEAR|FOREGROUND_SERVICE ... actions=1 ...)`.
+
+### End-to-end save (manual, user-performed copy)
+
+User copied a unique marker in a foreground main-space app and tapped the bubble. Logcat:
+
+```
+08-25 23:17:49.814 D INboxClipboardProbe: start
+08-25 23:17:49.873 D INboxClipboardProbe: focus
+08-25 23:17:49.875 D INboxClipboardProbe: clip count=1
+08-25 23:17:49.876 D INboxClipboardProbe: non-empty=true
+08-25 23:17:50.074 D INboxClipboardProbe: bridge status=saved
+```
+
+- File `/storage/emulated/0/测试/Universal Capture/2026-08-25.md` grew from 651 to 822 bytes.
+- Marker `TASK9-E2E-01-7QK2` appears exactly once (`grep -c` = 1) under `## 23:17` with capture id `20260825-231749-c25a`.
+- Two distinct copies saved across two taps (23:14 `他家红枣，椰子奶泡泡好吃`; 23:17 `TASK9-E2E-01-7QK2`) confirm the latest clipboard item is read each time, not a stale one.
+- The translucent `ClipboardCaptureActivity` finished and foreground returned to the source app.
+
+### Drag + edge snap
+
+- The 48 dp/126 px touch container (32 dp visible dot) drags left/right/center and snaps to the nearest horizontal edge on release; it stays within screen bounds and is not clipped by the status/navigation bars.
+- Persistence: the snapped side + Y are stored in a dedicated `inbox_overlay_prefs` shared-preferences file (not the Vault prefs); stopping and restarting the bubble restores the last position.
+
+### Stop from settings
+
+After tapping `停止悬浮球`:
+
+- `dumpsys window windows | grep ty=APPLICATION_OVERLAY | grep com.inbox.inbox_app` returns nothing (overlay view removed).
+- `dumpsys activity services com.inbox.inbox_app` returns no `OverlayService` `ServiceRecord` (FGS destroyed).
+- The ongoing `inbox_overlay` notification disappears; the low-importance notification channel remains (expected).
+- The settings UI flips to `开启悬浮球` / `悬浮球未开启`.
+
+### Force-stop (HyperOS-kill proxy)
+
+`adb shell am force-stop com.inbox.inbox_app` while the overlay is running:
+
+- The overlay window disappears and the FGS is destroyed with no crash.
+- Reopening settings shows `悬浮球未开启`; `OverlayService.isRunning` is false.
+- There is no `BOOT_COMPLETED` receiver and the service returns `START_NOT_STICKY`, so neither a reboot nor a HyperOS process cleanup auto-restarts it. The user restarts from settings.
+
+### Revocation robustness
+
+Not exercised live on the user's phone (per instructions, no toggle-revoke). Code path: `MainActivity.onResume` calls `OverlayService.stop(this)` when `OverlayService.isRunning && !Settings.canDrawOverlays(this)` and then `vaultBridge.notifyOverlayStateChanged()`, so a revoked overlay permission tears the service down and refreshes the UI without a stale `运行中` state.
+
+### Notes
+
+- A pre-existing unrelated working-tree change to `SafVaultStore.kt` was present at the start of Task 9; it was reverted to commit `4a3d18f` before the final build so Task 9 ships zero changes to the forbidden file.
+- No exported Activities, Accessibility, clipboard polling, IME history, image clipboard, AI, history UI, cloud sync, or battery-optimization permissions were added. `ClipboardCaptureActivity` remains `exported=false` / `noHistory=true`.
