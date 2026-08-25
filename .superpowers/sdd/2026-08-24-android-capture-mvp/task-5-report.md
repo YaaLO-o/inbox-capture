@@ -175,3 +175,40 @@ BUILD SUCCESSFUL
 The successful regression observes `commit:B` before `release:A`. The forced-failure regression observes `commit:B`, synchronous rollback `commit:A`, then `release:B`; it also asserts A remains stored and granted and B is not granted.
 
 Final verification passed: complete API 36 connected instrumentation 10/10, Android `testDebugUnitTest`, focused Task 5 Dart tests 11/11, full Flutter tests 119/119, and `dart analyze lib test` with no issues.
+
+## Review fix round 3: retain both grants when durability is unknown
+
+Scoped review found that round 2 ignored the rollback commit result. If both the B commit and rollback-to-A commit failed, the bridge still released B even though the durable descriptor could be A, B, or otherwise unknown.
+
+`VaultPreferences.save` now returns an explicit three-state result: `SAVED`, `RESTORED_PREVIOUS`, or `DURABILITY_UNKNOWN`. The bridge behavior is intentionally conservative:
+
+- `SAVED`: release a different previous A grant and return B;
+- `RESTORED_PREVIOUS`: release only the newly taken B grant and return stable `VAULT_UNAVAILABLE`;
+- `DURABILITY_UNKNOWN`: retain both A and B grants and return stable `VAULT_UNAVAILABLE`.
+
+No clear behavior or unrelated Task 5/6 code changed.
+
+### Review round 3 RED
+
+The deterministic preference boundary was extended to fail an exact number of consecutive commits. Before the production fix, a double failure executed both `commit:B` and rollback `commit:A`, but the bridge still released B. The focused run executed seven tests and failed only the new double-failure safety regression:
+
+```text
+Starting 7 tests on Pixel_6_API36(AVD) - 16
+doubleCommitFailureRetainsBothGrantsBecauseDurableVaultIsUnknown FAILED
+AndroidVaultBridgeTest.kt:131
+BUILD FAILED
+```
+
+### Review round 3 GREEN
+
+After making rollback outcome explicit and branching cleanup on it, the same focused run passed all seven tests:
+
+```text
+Starting 7 tests on Pixel_6_API36(AVD) - 16
+Finished 7 tests on Pixel_6_API36(AVD) - 16
+BUILD SUCCESSFUL
+```
+
+The new regression observes `commit:B`, `commit:A`, no release event, both grants retained, and `VAULT_UNAVAILABLE`. The prior single-failure regression still proves `commit:B`, successful `commit:A`, then `release:B`; the success regression still proves `commit:B` precedes `release:A`.
+
+Final verification passed: complete API 36 connected instrumentation 11/11, Android `testDebugUnitTest`, focused Task 5 Dart tests 11/11, full Flutter tests 119/119, and `dart analyze lib test` with no issues.

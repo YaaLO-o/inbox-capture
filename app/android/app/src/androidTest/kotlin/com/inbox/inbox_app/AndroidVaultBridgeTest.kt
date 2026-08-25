@@ -95,7 +95,7 @@ class AndroidVaultBridgeTest {
         val previousUri = Uri.parse("content://provider/tree/primary%3AObsidian")
         storePreviousVault(previousUri)
         events.clear()
-        sharedPreferences.failNextCommit = true
+        sharedPreferences.commitsToFail = 1
         val result = RecordingResult()
 
         bridge.handlePickedVault(PickedVault(validTreeUri, REQUIRED_FLAGS), result)
@@ -111,6 +111,27 @@ class AndroidVaultBridgeTest {
                 "commit:$previousUri",
                 "release:$validTreeUri",
             ),
+            events,
+        )
+        assertEquals("VAULT_UNAVAILABLE", result.errorCode)
+    }
+
+    @Test
+    fun doubleCommitFailureRetainsBothGrantsBecauseDurableVaultIsUnknown() {
+        val previousUri = Uri.parse("content://provider/tree/primary%3AObsidian")
+        storePreviousVault(previousUri)
+        events.clear()
+        sharedPreferences.commitsToFail = 2
+        val result = RecordingResult()
+
+        bridge.handlePickedVault(PickedVault(validTreeUri, REQUIRED_FLAGS), result)
+
+        assertEquals(previousUri, preferences.load()?.treeUri)
+        assertTrue(resolver.hasGrant(previousUri, REQUIRED_FLAGS))
+        assertTrue(resolver.hasGrant(validTreeUri, REQUIRED_FLAGS))
+        assertTrue(resolver.releases.isEmpty())
+        assertEquals(
+            listOf("commit:$validTreeUri", "commit:$previousUri"),
             events,
         )
         assertEquals("VAULT_UNAVAILABLE", result.errorCode)
@@ -181,7 +202,7 @@ private class RecordingSharedPreferences(
     private val events: MutableList<String>,
 ) : SharedPreferences {
     private val values = mutableMapOf<String, Any?>()
-    var failNextCommit = false
+    var commitsToFail = 0
 
     override fun getAll(): Map<String, *> = values.toMap()
 
@@ -266,8 +287,8 @@ private class RecordingSharedPreferences(
         override fun commit(): Boolean {
             record("commit")
             applyChanges()
-            if (!failNextCommit) return true
-            failNextCommit = false
+            if (commitsToFail == 0) return true
+            commitsToFail -= 1
             return false
         }
 

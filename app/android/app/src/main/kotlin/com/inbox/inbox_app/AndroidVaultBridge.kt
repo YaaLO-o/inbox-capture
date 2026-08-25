@@ -88,8 +88,17 @@ class AndroidVaultBridge(
             val displayName = DocumentFile.fromTreeUri(context, picked.uri)?.name
                 ?: picked.uri.lastPathSegment
                 ?: "Vault"
-            if (!preferences.save(picked.uri, displayName)) {
-                throw IllegalStateException("Could not persist Vault")
+            when (preferences.save(picked.uri, displayName)) {
+                VaultSaveResult.SAVED -> Unit
+                VaultSaveResult.RESTORED_PREVIOUS -> {
+                    releaseNewPermission(picked.uri, previousUri, grantFlags)
+                    result.error("VAULT_UNAVAILABLE", "Could not persist Vault", null)
+                    return
+                }
+                VaultSaveResult.DURABILITY_UNKNOWN -> {
+                    result.error("VAULT_UNAVAILABLE", "Could not persist Vault", null)
+                    return
+                }
             }
             releasePreviousPermission(previousUri, picked.uri)
             result.success(
