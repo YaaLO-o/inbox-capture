@@ -53,6 +53,18 @@ At the final gate check, `adb devices -l` showed only `emulator-5554`; the Xiaom
 
 Pass criterion remains at least 14/15 exact saves, no hang, and no navigation to full settings.
 
+### WeChat gate attempts 1-5
+
+The user copied the authorized benign WeChat token without sending it. Five explicit launches were performed one at a time using the temporary gate APK. Each reached focus, observed one non-empty clip, returned `saved`, exited, and returned WeChat (`com.tencent.mm`, user 999) to the foreground. The count-only shell inspection returned 0 before and after each attempt on both `/storage/emulated/0/测试` and `/storage/emulated/999/测试`; because the source app is in the work profile, this shell observation cannot establish the app-owned SAF Markdown occurrence. No token text was emitted.
+
+| # | Source app | Result | Probe facts | Activity exit | Shell token count |
+|---:|---|---|---|---|---:|
+| 1 | WeChat | saved | focus, clip count=1, non-empty=true, bridge status=saved | Yes; WeChat foreground | 0 |
+| 2 | WeChat | saved | focus, clip count=1, non-empty=true, bridge status=saved | Yes; WeChat foreground | 0 |
+| 3 | WeChat | saved | focus, clip count=1, non-empty=true, bridge status=saved | Yes; WeChat foreground | 0 |
+| 4 | WeChat | saved | focus, clip count=1, non-empty=true, bridge status=saved | Yes; WeChat foreground | 0 |
+| 5 | WeChat | saved | focus, clip count=1, non-empty=true, bridge status=saved | Yes; WeChat foreground | 0 |
+
 ### Xiaomi preparation and Chrome gate attempt
 
 The connected device was recorded as Xiaomi 13 Pro / `nuwa` / `2210132C`, API 36, fingerprint `Xiaomi/nuwa/nuwa:16/BP2A.250605.031.A3/OS3.0.310.0.WMBCNXM:user/release-keys`, HyperOS `OS3.0.310.0.WMBCNXM`. INbox and its androidTest APK were installed with `adb install -r -t` after USB installation authorization. The SAF descriptor persisted as `content://com.android.externalstorage.documents/tree/primary%3A测试`, display name `测试`; shell access was denied as expected because the grant belongs to INbox. For the gate only, a debug APK with the Activity temporarily exported was installed (SHA-256 `c143b6e1249658677c162de4aebf02b488b71ab7f5910338a4a31b5674c641c6`); the source manifest was restored to non-exported immediately after the minimal launch check.
