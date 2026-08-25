@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">INbox</string>
+    <string name="share_capture_success">Saved to INbox</string>
+    <string name="share_capture_error">Could not save to INbox</string>
 </resources>
