@@ -40,8 +40,7 @@ class ShareCaptureActivityOutcomeTest {
     @After
     fun tearDown() {
         lifecycle.unregister()
-        val application = targetContext.applicationContext as InboxApplication
-        AndroidCaptureBridge.attach(application.engine.dartExecutor.binaryMessenger)
+        restoreBridgeToRealEngine()
     }
 
     @Test
@@ -93,6 +92,27 @@ class ShareCaptureActivityOutcomeTest {
         assertEquals(1, lifecycle.destroyedCount)
     }
 
+    @Test
+    fun cleanupKeepsAttachedCoordinatorReadyForSubsequentCapture() {
+        restoreBridgeToRealEngine()
+        val callback = CountDownLatch(1)
+
+        AndroidCaptureBridge.capture(
+            mapOf("source" to "share", "text" to "https://example.com/cleanup-test"),
+        ) {
+            callback.countDown()
+        }
+
+        assertTrue(callback.await(3, TimeUnit.SECONDS))
+        assertEquals(1, messenger.delegatedCaptureCount)
+    }
+
+    private fun restoreBridgeToRealEngine() {
+        val application = targetContext.applicationContext as InboxApplication
+        messenger.delegate = application.engine.dartExecutor.binaryMessenger
+        messenger.ready()
+    }
+
     private fun launchScenario(): ActivityScenario<ShareCaptureActivity> =
         ActivityScenario.launch(
             Intent(targetContext, ShareCaptureActivity::class.java).apply {
@@ -124,6 +144,8 @@ private class ShareCaptureFakeMessenger : BinaryMessenger {
     private var incoming: BinaryMessenger.BinaryMessageHandler? = null
     var mode = FakeShareMode.TIMEOUT
     var captureCount = 0
+    var delegatedCaptureCount = 0
+    var delegate: BinaryMessenger? = null
 
     fun ready() {
         val handler = checkNotNull(incoming)
@@ -139,6 +161,12 @@ private class ShareCaptureFakeMessenger : BinaryMessenger {
         message: ByteBuffer?,
         callback: BinaryMessenger.BinaryReply?,
     ) {
+        if (delegate != null) {
+            val call = codec.decodeMethodCall(message!!.duplicate().flipped())
+            if (call.method == "capture") delegatedCaptureCount += 1
+            delegate!!.send(channel, message, callback)
+            return
+        }
         val call = codec.decodeMethodCall(message!!.flipped())
         if (call.method != "capture") return
         captureCount += 1

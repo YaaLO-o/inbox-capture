@@ -57,6 +57,8 @@ Activity-level outcome verification runs against the exact production `ShareCapt
 - `ShareCaptureActivity` handles orientation, screen-size, and smallest-screen-size changes without recreation. `ShareCaptureActivityConfigTest` verifies those manifest flags, while `ShareCaptureCoordinatorTest` verifies one submission/outcome for success, bridge error, and the existing ten-second readiness-timeout result (including duplicate callbacks).
 - Focused native checks passed: `:app:testDebugUnitTest`, `:app:connectedDebugAndroidTest` (18 tests on `Pixel_6_API36`), and `:app:assembleDebug`. Flutter tests passed (120 tests).
 
+- Round 4 cleanup regression keeps the original test-attached coordinator alive: teardown switches the fake messenger's outgoing capture calls to the real engine messenger and signals `coreReady` through the coordinator's existing inbound handler. The added post-cleanup capture delegated and completed within three seconds; the focused Activity class passed 5/5 on `Pixel_6_API36`.
+
 ## Real Sharesheet
 
 `com.android.chrome` is installed and resolves ordinary web URLs, but Chrome's first-run UI remained at `Checking info…` after selecting `Use without an account`. This prevented completing Chrome's real Sharesheet flow. This is an emulator/source-app setup blocker, not a substituted direct component test.
