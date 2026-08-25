@@ -41,11 +41,13 @@ class CaptureService {
       return const CaptureResult(CaptureStatus.error, message: '操作过于频繁');
     }
     _lastCaptureAt = timestamp;
-    return captureInput(
-      vaultId,
-      (await clipboard.read()).toCaptureInput(),
-      now: timestamp,
-    );
+    final CaptureInput input;
+    try {
+      input = (await clipboard.read()).toCaptureInput();
+    } catch (_) {
+      return const CaptureResult(CaptureStatus.error);
+    }
+    return captureInput(vaultId, input, now: timestamp);
   }
 
   Future<CaptureResult> captureInput(
@@ -81,7 +83,12 @@ class CaptureService {
       final attachments = <Attachment>[];
       for (var index = 0; index < input.attachments.length; index++) {
         final inputAttachment = input.attachments[index];
-        final suffix = index == 0 ? '' : '-$index';
+        final suffix =
+            input.usesDesktopFileNames && input.attachments.length > 1
+            ? '-$index'
+            : index == 0
+            ? ''
+            : '-$index';
         final extension = _safeExtension(inputAttachment.extension);
         final fileName = '$id$suffix${extension.isEmpty ? '' : '.$extension'}';
         await storage.importAttachment(

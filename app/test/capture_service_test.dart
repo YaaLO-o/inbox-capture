@@ -21,6 +21,12 @@ class FakeClipboard implements ClipboardReader {
   Future<ClipboardContent> read() async => content;
 }
 
+class ThrowingClipboard implements ClipboardReader {
+  @override
+  Future<ClipboardContent> read() =>
+      Future.error(StateError('raw channel error'));
+}
+
 class RecordingVaultStorage implements VaultStorage {
   String? appendedMarkdown;
 
@@ -183,6 +189,59 @@ void main() {
       'append:2026-08-24',
     ]);
   });
+
+  test(
+    'desktop two-file captures preserve zero-based attachment names',
+    () async {
+      final now = DateTime(2026, 8, 24, 9, 30, 12);
+      final first = File('${tmp.path}/first.png')..writeAsBytesSync([1]);
+      final second = File('${tmp.path}/second.jpg')..writeAsBytesSync([2]);
+      final service = CaptureService(
+        clipboard: FakeClipboard(
+          ClipboardContent(text: 'two files', files: [first.path, second.path]),
+        ),
+        storage: storage,
+        idGenerator: (_) => '20260824-093012-abcd',
+      );
+
+      final result = await service.captureNow(tmp.path, now: now);
+
+      expect(result.status, CaptureStatus.saved);
+      expect(
+        File(
+          '${VaultPaths.attachmentsDir(tmp.path)}/20260824-093012-abcd-0.png',
+        ).existsSync(),
+        isTrue,
+      );
+      expect(
+        File(
+          '${VaultPaths.attachmentsDir(tmp.path)}/20260824-093012-abcd-1.jpg',
+        ).existsSync(),
+        isTrue,
+      );
+      final markdown = readInbox(tmp.path, now);
+      expect(markdown, contains('![[attachments/20260824-093012-abcd-0.png]]'));
+      expect(markdown, contains('![[attachments/20260824-093012-abcd-1.jpg]]'));
+    },
+  );
+
+  test(
+    'captureNow converts clipboard read failures to a safe error result',
+    () async {
+      final service = CaptureService(
+        clipboard: ThrowingClipboard(),
+        storage: storage,
+      );
+
+      final result = await service.captureNow(
+        tmp.path,
+        now: DateTime(2026, 8, 24),
+      );
+
+      expect(result.status, CaptureStatus.error);
+      expect(result.message, isNull);
+    },
+  );
 
   test(
     'captureInput rolls back completed imports when a later import fails',

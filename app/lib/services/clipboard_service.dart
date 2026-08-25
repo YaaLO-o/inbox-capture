@@ -57,6 +57,7 @@ class ClipboardContent {
       source: CaptureSource.desktopClipboard,
       text: text,
       attachments: List.unmodifiable(attachments),
+      usesDesktopFileNames: files.isNotEmpty,
     );
   }
 

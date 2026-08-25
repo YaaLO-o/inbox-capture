@@ -6,11 +6,13 @@ final class CaptureInput {
   final CaptureSource source;
   final String? text;
   final List<CaptureAttachmentInput> attachments;
+  final bool usesDesktopFileNames;
 
   const CaptureInput({
     this.source = CaptureSource.desktopClipboard,
     this.text,
     this.attachments = const [],
+    this.usesDesktopFileNames = false,
   });
 
   bool get hasContent =>
