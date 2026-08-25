@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.webkit.MimeTypeMap
 import androidx.documentfile.provider.DocumentFile
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
@@ -17,20 +18,19 @@ data class CaptureDirs(
 class SafVaultStore(private val context: Context) {
     private val contentResolver: ContentResolver = context.contentResolver
 
+    private data class ChildDocument(
+        val file: DocumentFile,
+        val mimeType: String,
+    )
+
     fun ensureLayout(treeUri: Uri): CaptureDirs {
         val root = DocumentFile.fromTreeUri(context, treeUri)
             ?: throw FileNotFoundException("Vault unavailable")
         if (!root.exists() || !root.isDirectory || !root.canWrite()) {
             throw FileNotFoundException("Vault unavailable")
         }
-        val capture = root.findFile(CAPTURE_DIRECTORY)
-            ?: root.createDirectory(CAPTURE_DIRECTORY)
-            ?: throw IOException("Could not create capture directory")
-        if (!capture.isDirectory) throw IOException("Capture path is not a directory")
-        val attachments = capture.findFile(ATTACHMENTS_DIRECTORY)
-            ?: capture.createDirectory(ATTACHMENTS_DIRECTORY)
-            ?: throw IOException("Could not create attachments directory")
-        if (!attachments.isDirectory) throw IOException("Attachments path is not a directory")
+        val capture = exactDirectory(root, CAPTURE_DIRECTORY)
+        val attachments = exactDirectory(capture, ATTACHMENTS_DIRECTORY)
         return CaptureDirs(capture, attachments)
     }
 
@@ -82,20 +82,183 @@ class SafVaultStore(private val context: Context) {
     }
 
     fun deleteAttachment(treeUri: Uri, fileName: String) {
-        val attachment = ensureLayout(treeUri).attachments.findFile(fileName) ?: return
-        if (!DocumentsContract.deleteDocument(contentResolver, attachment.uri)) {
+        val attachment = exactChild(
+            ensureLayout(treeUri).attachments,
+            fileName,
+            expectedFileMimeType(fileName, "application/octet-stream"),
+        ) ?: return
+        if (attachment.mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
+            throw IOException("$fileName is a directory")
+        }
+        if (!DocumentsContract.deleteDocument(contentResolver, attachment.file.uri)) {
             throw IOException("Could not delete attachment")
         }
     }
 
     private fun writableFile(parent: DocumentFile, fileName: String, mimeType: String): DocumentFile {
-        return parent.findFile(fileName)
-            ?: parent.createFile(mimeType, fileName)
+        val expectedMimeType = expectedFileMimeType(fileName, mimeType)
+        exactChild(parent, fileName, expectedMimeType)?.let { existing ->
+            if (existing.mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
+                throw IOException("$fileName is a directory")
+            }
+            return existing.file
+        }
+        DocumentsContract.createDocument(contentResolver, parent.uri, mimeType, fileName)
             ?: throw IOException("Could not create $fileName")
+        val created = exactChild(parent, fileName, expectedMimeType)
+            ?: throw IOException("Provider did not create exact file $fileName")
+        if (created.mimeType == DocumentsContract.Document.MIME_TYPE_DIR) {
+            throw IOException("$fileName is a directory")
+        }
+        return created.file
+    }
+
+    private fun exactDirectory(parent: DocumentFile, displayName: String): DocumentFile {
+        exactChild(
+            parent,
+            displayName,
+            DocumentsContract.Document.MIME_TYPE_DIR,
+        )?.let { existing ->
+            if (existing.mimeType != DocumentsContract.Document.MIME_TYPE_DIR) {
+                throw IOException("$displayName is not a directory")
+            }
+            return existing.file
+        }
+        DocumentsContract.createDocument(
+            contentResolver,
+            parent.uri,
+            DocumentsContract.Document.MIME_TYPE_DIR,
+            displayName,
+        )
+            ?: throw IOException("Could not create directory $displayName")
+        val created = exactChild(
+            parent,
+            displayName,
+            DocumentsContract.Document.MIME_TYPE_DIR,
+        )
+            ?: throw IOException("Provider did not create exact directory $displayName")
+        if (created.mimeType != DocumentsContract.Document.MIME_TYPE_DIR) {
+            throw IOException("$displayName is not a directory")
+        }
+        return created.file
+    }
+
+    private fun exactChild(
+        parent: DocumentFile,
+        displayName: String,
+        expectedMimeType: String,
+    ): ChildDocument? {
+        val parentDocumentId = DocumentsContract.getDocumentId(parent.uri)
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(
+            parent.uri,
+            parentDocumentId,
+        )
+        val cursor = contentResolver.query(
+            childrenUri,
+            arrayOf(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                DocumentsContract.Document.COLUMN_MIME_TYPE,
+            ),
+            null,
+            null,
+            null,
+        ) ?: throw IOException("Could not list children of $parentDocumentId")
+        cursor.use {
+            val idColumn = it.getColumnIndexOrThrow(
+                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            )
+            val nameColumn = it.getColumnIndexOrThrow(
+                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            )
+            val mimeTypeColumn = it.getColumnIndexOrThrow(
+                DocumentsContract.Document.COLUMN_MIME_TYPE,
+            )
+            while (it.moveToNext()) {
+                if (it.getString(nameColumn) != displayName) continue
+                val childUri = DocumentsContract.buildDocumentUriUsingTree(
+                    parent.uri,
+                    it.getString(idColumn),
+                )
+                val child = DocumentFile.fromSingleUri(context, childUri)
+                    ?: throw IOException("Could not open exact child $displayName")
+                return ChildDocument(child, it.getString(mimeTypeColumn))
+            }
+        }
+        if (parent.uri.authority != EXTERNAL_STORAGE_AUTHORITY) return null
+        return exactExternalStorageChild(
+            parent,
+            parentDocumentId,
+            displayName,
+            expectedMimeType,
+        )
+    }
+
+    private fun exactExternalStorageChild(
+        parent: DocumentFile,
+        parentDocumentId: String,
+        displayName: String,
+        expectedMimeType: String,
+    ): ChildDocument? {
+        val expectedDocumentId = "$parentDocumentId/$displayName"
+        val childUri = DocumentsContract.buildDocumentUriUsingTree(
+            parent.uri,
+            expectedDocumentId,
+        )
+        val cursor = try {
+            contentResolver.query(
+                childUri,
+                arrayOf(
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE,
+                ),
+                null,
+                null,
+                null,
+            )
+        } catch (_: FileNotFoundException) {
+            return null
+        } ?: return null
+        cursor.use {
+            if (!it.moveToFirst()) return null
+            val documentId = it.getString(
+                it.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID),
+            )
+            val actualName = it.getString(
+                it.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+            )
+            val actualMimeType = it.getString(
+                it.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE),
+            )
+            if (
+                documentId != expectedDocumentId ||
+                actualName != displayName ||
+                actualMimeType != expectedMimeType
+            ) {
+                throw IOException(
+                    "Exact child metadata mismatch for $displayName: " +
+                        "$documentId|$actualName|$actualMimeType",
+                )
+            }
+            if (it.moveToNext()) {
+                throw IOException("Multiple exact children for $displayName")
+            }
+            val child = DocumentFile.fromSingleUri(context, childUri)
+                ?: throw IOException("Could not open exact child $displayName")
+            return ChildDocument(child, actualMimeType)
+        }
+    }
+
+    private fun expectedFileMimeType(fileName: String, fallback: String): String {
+        val extension = fileName.substringAfterLast('.', "").lowercase()
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: fallback
     }
 
     companion object {
         private const val CAPTURE_DIRECTORY = "Universal Capture"
         private const val ATTACHMENTS_DIRECTORY = "attachments"
+        private const val EXTERNAL_STORAGE_AUTHORITY =
+            "com.android.externalstorage.documents"
     }
 }

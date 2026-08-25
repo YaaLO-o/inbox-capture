@@ -9,9 +9,12 @@ import android.provider.DocumentsContract
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.provider.ProviderTestRule
+import java.io.IOException
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -116,6 +119,73 @@ class SafVaultStoreTest {
         )
     }
 
+    @Test
+    fun reusesExactExistingLayoutWhenChildQueriesAreEmpty() {
+        val captureDirectory = DocumentsContract.createDocument(
+            resolver,
+            rootDocumentUri,
+            DocumentsContract.Document.MIME_TYPE_DIR,
+            "Universal Capture",
+        )!!
+        val attachments = DocumentsContract.createDocument(
+            resolver,
+            captureDirectory,
+            DocumentsContract.Document.MIME_TYPE_DIR,
+            "attachments",
+        )!!
+        val markdown = DocumentsContract.createDocument(
+            resolver,
+            captureDirectory,
+            "text/markdown",
+            "2026-08-25.md",
+        )!!
+        resolver.openOutputStream(markdown, "wt")!!.use {
+            it.write("existing\n".toByteArray())
+        }
+        val sentinel = DocumentsContract.createDocument(
+            resolver,
+            rootDocumentUri,
+            "application/octet-stream",
+            TestDocumentsProvider.XIAOMI_EMPTY_CHILD_QUERY_SENTINEL,
+        )!!
+
+        val firstLayout = store.ensureLayout(treeUri)
+        val secondLayout = store.ensureLayout(treeUri)
+        store.appendMarkdown(treeUri, "2026-08-25", "first\n")
+        store.appendMarkdown(treeUri, "2026-08-25", "second\n")
+
+        assertEquals(captureDirectory, firstLayout.capture.uri)
+        assertEquals(captureDirectory, secondLayout.capture.uri)
+        assertEquals(attachments, firstLayout.attachments.uri)
+        assertEquals(attachments, secondLayout.attachments.uri)
+        assertEquals(
+            "existing\nfirst\nsecond\n",
+            resolver.openInputStream(markdown)!!.bufferedReader().use { it.readText() },
+        )
+        DocumentsContract.deleteDocument(resolver, sentinel)
+        assertTrue(
+            childNames(rootDocumentUri).none {
+                it.startsWith("Universal Capture (")
+            },
+        )
+    }
+
+    @Test
+    fun rejectsAutoRenamedDirectoryFromProvider() {
+        DocumentsContract.createDocument(
+            resolver,
+            rootDocumentUri,
+            "application/octet-stream",
+            TestDocumentsProvider.AUTO_RENAME_DIRECTORY_SENTINEL,
+        )
+
+        assertThrows(IOException::class.java) {
+            store.ensureLayout(treeUri)
+        }
+        assertNull(child(rootDocumentUri, "Universal Capture"))
+        assertTrue(childNames(rootDocumentUri).contains("Universal Capture (1)"))
+    }
+
     private fun child(parent: Uri, displayName: String): Uri? {
         val parentDocumentId = DocumentsContract.getDocumentId(parent)
         val children = DocumentsContract.buildChildDocumentsUriUsingTree(
@@ -144,7 +214,26 @@ class SafVaultStoreTest {
         return null
     }
 
+    private fun childNames(parent: Uri): List<String> {
+        val parentDocumentId = DocumentsContract.getDocumentId(parent)
+        val children = DocumentsContract.buildChildDocumentsUriUsingTree(
+            parent,
+            parentDocumentId,
+        )
+        return resolver.query(
+            children,
+            arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+            null,
+            null,
+            null,
+        )!!.use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) add(cursor.getString(0))
+            }
+        }
+    }
+
     private companion object {
-        const val TEST_AUTHORITY = "com.inbox.inbox_app.test.test.documents"
+        const val TEST_AUTHORITY = "com.android.externalstorage.documents"
     }
 }

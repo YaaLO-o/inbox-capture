@@ -56,7 +56,9 @@ class TestDocumentsProvider : DocumentsProvider() {
         documentId: String,
         projection: Array<out String>?,
     ): Cursor = MatrixCursor(projection ?: DOCUMENT_COLUMNS).also { cursor ->
-        includeDocument(cursor, fileForId(documentId))
+        val file = fileForId(documentId)
+        if (!file.exists()) throw FileNotFoundException("Unknown document $documentId")
+        includeDocument(cursor, file)
     }
 
     override fun queryChildDocuments(
@@ -64,6 +66,7 @@ class TestDocumentsProvider : DocumentsProvider() {
         projection: Array<out String>?,
         sortOrder: String?,
     ): Cursor = MatrixCursor(projection ?: DOCUMENT_COLUMNS).also { cursor ->
+        if (hasXiaomiEmptyChildQueryBehavior()) return@also
         fileForId(parentDocumentId).listFiles()?.sortedBy(File::getName)?.forEach {
             includeDocument(cursor, it)
         }
@@ -78,7 +81,19 @@ class TestDocumentsProvider : DocumentsProvider() {
         displayName: String,
     ): String {
         val parent = fileForId(parentDocumentId)
-        val target = File(parent, displayName)
+        var target = File(parent, displayName)
+        if (
+            mimeType == Document.MIME_TYPE_DIR &&
+            rootDirectory.resolve(AUTO_RENAME_DIRECTORY_SENTINEL).exists()
+        ) {
+            target = File(parent, "$displayName (1)")
+        } else if (hasXiaomiEmptyChildQueryBehavior() && target.exists()) {
+            var suffix = 1
+            while (target.exists()) {
+                target = File(parent, "$displayName ($suffix)")
+                suffix++
+            }
+        }
         val created = if (mimeType == Document.MIME_TYPE_DIR) {
             target.mkdir()
         } else {
@@ -155,6 +170,9 @@ class TestDocumentsProvider : DocumentsProvider() {
         "$ROOT_DOCUMENT_ID/${file.relativeTo(rootDirectory).invariantSeparatorsPath}"
     }
 
+    private fun hasXiaomiEmptyChildQueryBehavior(): Boolean =
+        rootDirectory.resolve(XIAOMI_EMPTY_CHILD_QUERY_SENTINEL).exists()
+
     private fun addIfRequested(
         row: MatrixCursor.RowBuilder,
         cursor: MatrixCursor,
@@ -169,6 +187,7 @@ class TestDocumentsProvider : DocumentsProvider() {
         "jpg", "jpeg" -> "image/jpeg"
         "gif" -> "image/gif"
         "webp" -> "image/webp"
+        "md" -> "text/markdown"
         "pdf" -> "application/pdf"
         "mp4" -> "video/mp4"
         "mov" -> "video/quicktime"
@@ -178,6 +197,8 @@ class TestDocumentsProvider : DocumentsProvider() {
     companion object {
         const val ROOT_DOCUMENT_ID = "root"
         const val REJECT_APPEND_SENTINEL = ".reject_append"
+        const val XIAOMI_EMPTY_CHILD_QUERY_SENTINEL = ".xiaomi_empty_child_query"
+        const val AUTO_RENAME_DIRECTORY_SENTINEL = ".auto_rename_directory"
         private const val TEST_DIRECTORY = "saf-vault-test-documents"
 
         private val ROOT_COLUMNS = arrayOf(
