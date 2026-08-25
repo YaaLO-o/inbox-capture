@@ -133,6 +133,16 @@ class _PixelChestPetState extends State<PixelChestPet>
         _setState(PetAnimationState.error);
         await _play(PixelChestAtlas.empty);
         break;
+      case CaptureStatus.vaultUnavailable:
+        _showFeedback('Vault 不可用');
+        _setState(PetAnimationState.error);
+        await _play(PixelChestAtlas.error);
+        break;
+      case CaptureStatus.permissionDenied:
+        _showFeedback('没有访问 Vault 的权限');
+        _setState(PetAnimationState.error);
+        await _play(PixelChestAtlas.error);
+        break;
       case CaptureStatus.error:
         _showFeedback('保存失败');
         _setState(PetAnimationState.error);
@@ -170,6 +180,8 @@ class _PixelChestPetState extends State<PixelChestPet>
       _feedback = switch (result.status) {
         CaptureStatus.saved => null,
         CaptureStatus.empty => '剪贴板为空',
+        CaptureStatus.vaultUnavailable => 'Vault 不可用',
+        CaptureStatus.permissionDenied => '没有访问 Vault 的权限',
         CaptureStatus.error => '保存失败',
       };
       _feedbackVisible = _feedback != null;

@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inbox_app/models/capture.dart';
+import 'package:inbox_app/models/capture_input.dart';
 import 'package:inbox_app/services/capture_service.dart';
 import 'package:inbox_app/services/clipboard_service.dart';
 import 'package:inbox_app/services/desktop_file_vault_storage.dart';
@@ -45,6 +47,58 @@ class RecordingVaultStorage implements VaultStorage {
   ) async {}
 }
 
+class TransactionRecordingStorage implements VaultStorage {
+  final events = <String>[];
+  final Completer<void>? firstImportCompleter;
+  final int? failImportAt;
+  final VaultStorageException? appendError;
+  int _imports = 0;
+
+  TransactionRecordingStorage({
+    this.firstImportCompleter,
+    this.failImportAt,
+    this.appendError,
+  });
+
+  @override
+  Future<void> ensureLayout(String vaultId) async =>
+      events.add('ensure:$vaultId');
+
+  @override
+  Future<void> importAttachment(
+    String vaultId,
+    AttachmentSource source,
+    String fileName,
+  ) async {
+    events.add('import:$fileName');
+    _imports++;
+    if (_imports == 1 && firstImportCompleter != null) {
+      await firstImportCompleter!.future;
+    }
+    if (_imports == failImportAt) {
+      throw const VaultStorageException(
+        VaultStorageException.importFailed,
+        'import failed',
+      );
+    }
+  }
+
+  @override
+  Future<void> appendMarkdown(
+    String vaultId,
+    DateTime date,
+    String markdown,
+  ) async {
+    events.add('append:${date.toIso8601String().substring(0, 10)}');
+    if (appendError != null) throw appendError!;
+  }
+
+  @override
+  Future<void> deleteAttachment(String vaultId, String fileName) async {
+    events.add('delete:$fileName');
+  }
+}
+
 void main() {
   late Directory tmp;
   late DesktopFileVaultStorage storage;
@@ -60,6 +114,221 @@ void main() {
 
   String readInbox(String vault, DateTime d) =>
       File(VaultPaths.dailyInboxFile(vault, d)).readAsStringSync();
+
+  test('native request map normalizes only supported attachment fields', () {
+    final input = CaptureInput.fromMap({
+      'text': 'https://example.com',
+      'attachments': [
+        {
+          'uri': 'content://provider/photo/7',
+          'displayName': '照片.png',
+          'mimeType': 'image/png',
+          'extension': 'PNG',
+        },
+        {'uri': 'file:///tmp/rejected.jpg', 'extension': 'jpg'},
+        {'uri': 'content://provider/unsafe', 'extension': 'bad#ext'},
+      ],
+    });
+
+    expect(input.text, 'https://example.com');
+    expect(input.attachments, hasLength(2));
+    expect(input.attachments.first.source, isA<UriAttachmentSource>());
+    expect(input.attachments.first.extension, 'png');
+    expect(input.attachments.last.extension, isEmpty);
+  });
+
+  test(
+    'native request map ignores non-string fields and detects empty input',
+    () {
+      final input = CaptureInput.fromMap({
+        'text': 7,
+        'attachments': [
+          {'uri': 9, 'extension': 'png'},
+          'not-a-map',
+        ],
+      });
+
+      expect(input.text, isNull);
+      expect(input.attachments, isEmpty);
+      expect(input.hasContent, isFalse);
+    },
+  );
+
+  test('captureInput imports then appends with deterministic names', () async {
+    final storage = TransactionRecordingStorage();
+    final service = CaptureService(
+      clipboard: FakeClipboard(const ClipboardContent()),
+      storage: storage,
+      idGenerator: (_) => '20260824-093012-abcd',
+    );
+
+    final result = await service.captureInput(
+      'vault',
+      CaptureInput(
+        text: 'note',
+        attachments: const [
+          CaptureAttachmentInput(
+            source: UriAttachmentSource('content://provider/photo/7'),
+            extension: 'png',
+          ),
+        ],
+      ),
+      now: DateTime(2026, 8, 24, 9, 30, 12),
+    );
+
+    expect(result.status, CaptureStatus.saved);
+    expect(storage.events, [
+      'ensure:vault',
+      'import:20260824-093012-abcd.png',
+      'append:2026-08-24',
+    ]);
+  });
+
+  test(
+    'captureInput rolls back completed imports when a later import fails',
+    () async {
+      final storage = TransactionRecordingStorage(failImportAt: 2);
+      final service = CaptureService(
+        clipboard: FakeClipboard(const ClipboardContent()),
+        storage: storage,
+        idGenerator: (_) => '20260824-093012-abcd',
+      );
+
+      final result = await service.captureInput(
+        'vault',
+        CaptureInput(
+          attachments: const [
+            CaptureAttachmentInput(
+              source: UriAttachmentSource('content://one'),
+              extension: 'png',
+            ),
+            CaptureAttachmentInput(
+              source: UriAttachmentSource('content://two'),
+              extension: 'jpg',
+            ),
+          ],
+        ),
+        now: DateTime(2026, 8, 24, 9, 30, 12),
+      );
+
+      expect(result.status, CaptureStatus.error);
+      expect(storage.events.sublist(storage.events.length - 1), [
+        'delete:20260824-093012-abcd.png',
+      ]);
+    },
+  );
+
+  test(
+    'captureInput rolls back imports in reverse when append fails',
+    () async {
+      final storage = TransactionRecordingStorage(
+        appendError: const VaultStorageException(
+          VaultStorageException.appendFailed,
+          'append failed',
+        ),
+      );
+      final service = CaptureService(
+        clipboard: FakeClipboard(const ClipboardContent()),
+        storage: storage,
+        idGenerator: (_) => '20260824-093012-abcd',
+      );
+
+      final result = await service.captureInput(
+        'vault',
+        CaptureInput(
+          attachments: const [
+            CaptureAttachmentInput(
+              source: UriAttachmentSource('content://one'),
+              extension: 'png',
+            ),
+            CaptureAttachmentInput(
+              source: UriAttachmentSource('content://two'),
+              extension: 'jpg',
+            ),
+          ],
+        ),
+        now: DateTime(2026, 8, 24, 9, 30, 12),
+      );
+
+      expect(result.status, CaptureStatus.error);
+      expect(storage.events.sublist(storage.events.length - 2), [
+        'delete:20260824-093012-abcd-1.jpg',
+        'delete:20260824-093012-abcd.png',
+      ]);
+    },
+  );
+
+  test('captureInput serializes overlapping storage transactions', () async {
+    final firstImport = Completer<void>();
+    final storage = TransactionRecordingStorage(
+      firstImportCompleter: firstImport,
+    );
+    final service = CaptureService(
+      clipboard: FakeClipboard(const ClipboardContent()),
+      storage: storage,
+      idGenerator: (_) => 'id',
+    );
+    const input = CaptureInput(
+      attachments: [
+        CaptureAttachmentInput(
+          source: UriAttachmentSource('content://one'),
+          extension: 'png',
+        ),
+      ],
+    );
+
+    final first = service.captureInput(
+      'vault',
+      input,
+      now: DateTime(2026, 8, 24),
+    );
+    final second = service.captureInput(
+      'vault',
+      input,
+      now: DateTime(2026, 8, 25),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(storage.events, ['ensure:vault', 'import:id.png']);
+
+    firstImport.complete();
+    await Future.wait([first, second]);
+    expect(storage.events, [
+      'ensure:vault',
+      'import:id.png',
+      'append:2026-08-24',
+      'ensure:vault',
+      'import:id.png',
+      'append:2026-08-25',
+    ]);
+  });
+
+  test('captureInput maps typed storage failures to stable statuses', () async {
+    for (final entry in <({String code, CaptureStatus status})>[
+      (
+        code: VaultStorageException.vaultUnavailable,
+        status: CaptureStatus.vaultUnavailable,
+      ),
+      (
+        code: VaultStorageException.permissionDenied,
+        status: CaptureStatus.permissionDenied,
+      ),
+    ]) {
+      final storage = TransactionRecordingStorage(
+        appendError: VaultStorageException(entry.code, 'storage message'),
+      );
+      final service = CaptureService(
+        clipboard: FakeClipboard(const ClipboardContent()),
+        storage: storage,
+      );
+      final result = await service.captureInput(
+        'vault',
+        const CaptureInput(text: 'note'),
+        now: DateTime(2026, 8, 24),
+      );
+      expect(result.status, entry.status);
+      expect(result.message, 'storage message');
+    }
+  });
 
   test('两个桌面平台共享 Universal Capture 路径协议', () {
     final now = DateTime(2026, 8, 21, 10, 32, 15);
