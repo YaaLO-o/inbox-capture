@@ -49,6 +49,12 @@ adb -s emulator-5554 shell am start -a android.intent.action.SEND -t text/plain 
 
 The Android `ResolverActivity` displayed `INbox` among Quick Share, Chrome, Gmail, Bluetooth, and Chat. I selected the INbox target icon in the system chooser and confirmed `Just once`. No `ShareCaptureActivity` remained after the handoff; the actual Markdown file contained `https://example.com/task6-sharesheet-20260825` exactly once (`rg -o ... | wc -l` = `1`).
 
+## Review fixes
+
+- `EXTRA_TEXT` is read as `CharSequence` and converted to `String`, preserving styled-share characters; an instrumentation regression covers `SpannableString`.
+- `ShareCaptureActivity` handles orientation, screen-size, and smallest-screen-size changes without recreation. `ShareCaptureActivityConfigTest` verifies those manifest flags, while `ShareCaptureCoordinatorTest` verifies one submission/outcome for success, bridge error, and the existing ten-second readiness-timeout result (including duplicate callbacks).
+- Focused native checks passed: `:app:testDebugUnitTest`, `:app:connectedDebugAndroidTest` (18 tests on `Pixel_6_API36`), and `:app:assembleDebug`. Flutter tests passed (120 tests).
+
 ## Real Sharesheet
 
 `com.android.chrome` is installed and resolves ordinary web URLs, but Chrome's first-run UI remained at `Checking info…` after selecting `Use without an account`. This prevented completing Chrome's real Sharesheet flow. This is an emulator/source-app setup blocker, not a substituted direct component test.

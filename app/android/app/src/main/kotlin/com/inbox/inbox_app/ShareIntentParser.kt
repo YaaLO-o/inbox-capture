@@ -21,7 +21,7 @@ class ShareIntentParser(
 ) {
     fun parse(intent: Intent): ShareRequest? {
         if (intent.action != Intent.ACTION_SEND || intent.type != "text/plain") return null
-        val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return null
+        val text = intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString() ?: return null
         if (text.isBlank()) return null
         return ShareRequest(text = text, attachments = emptyList())
     }

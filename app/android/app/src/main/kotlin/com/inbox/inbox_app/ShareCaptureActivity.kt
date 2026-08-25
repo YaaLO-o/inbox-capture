@@ -5,24 +5,22 @@ import android.os.Bundle
 import android.widget.Toast
 
 class ShareCaptureActivity : Activity() {
+    private lateinit var coordinator: ShareCaptureCoordinator
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        coordinator = ShareCaptureCoordinator(AndroidCaptureBridge::capture) { success ->
+            runOnUiThread { showResult(success) }
+        }
+
         val request = ShareIntentParser(contentResolver).parse(intent)
         if (request == null) {
-            showResult(success = false)
+            coordinator.reject()
             return
         }
 
-        AndroidCaptureBridge.capture(
-            mapOf(
-                "source" to "share",
-                "text" to request.text,
-                "attachments" to emptyList<Map<String, Any?>>(),
-            ),
-        ) { result ->
-            runOnUiThread { showResult(success = result["status"] == "saved") }
-        }
+        coordinator.submit(request)
     }
 
     private fun showResult(success: Boolean) {
