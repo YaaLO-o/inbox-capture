@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'models/app_release.dart';
+import 'services/android_capture_dispatcher.dart';
 import 'services/app_command_service.dart';
 import 'services/capture_service.dart';
 import 'services/clipboard_service.dart';
@@ -12,8 +14,15 @@ import 'ui/onboarding_view.dart';
 import 'ui/update_view.dart';
 import 'ui/window_sizes.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    await AndroidCaptureDispatcher(
+      vaultId: () async => null,
+      capture: (_, _) async =>
+          const CaptureResult(CaptureStatus.vaultUnavailable),
+    ).start();
+  }
   runApp(const InboxApp());
 }
 
