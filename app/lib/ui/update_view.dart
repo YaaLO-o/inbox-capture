@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../models/app_release.dart';
@@ -36,6 +38,7 @@ class _UpdateViewState extends State<UpdateView> {
   _UpdateState _state = _UpdateState.checking;
   AppRelease? _release;
   DownloadProgress? _progress;
+  String? _errorMessage;
   bool _operationActive = false;
 
   @override
@@ -54,9 +57,18 @@ class _UpdateViewState extends State<UpdateView> {
             ? _UpdateState.available
             : _UpdateState.current;
       });
+    } on UpdateException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _state = _UpdateState.error;
+        _errorMessage = e.message;
+      });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _state = _UpdateState.error);
+      setState(() {
+        _state = _UpdateState.error;
+        _errorMessage = '检查更新失败，请稍后重试';
+      });
     }
   }
 
@@ -67,9 +79,11 @@ class _UpdateViewState extends State<UpdateView> {
     setState(() {
       _state = _UpdateState.downloading;
       _progress = null;
+      _errorMessage = null;
       _operationActive = true;
     });
 
+    File? downloadedFile;
     try {
       final file = await widget.service.download(
         release,
@@ -78,19 +92,55 @@ class _UpdateViewState extends State<UpdateView> {
           setState(() => _progress = progress);
         },
       );
+      downloadedFile = file;
       if (!mounted) return;
       setState(() {
         _state = _UpdateState.installing;
       });
       await widget.installer(file.path);
+      // installer 成功后会终止 App；正常情况下不会继续执行到这里。
+      // 如果 installer 正常返回而没有终止（例如测试环境），重置操作状态，
+      // 让用户可以关闭窗口。
       if (!mounted) return;
       setState(() => _operationActive = false);
-    } catch (_) {
+    } on UpdateException catch (e) {
       if (!mounted) return;
       setState(() {
         _state = _UpdateState.error;
+        _errorMessage = e.message;
         _operationActive = false;
       });
+      // 下载或校验失败时清理临时文件
+      if (downloadedFile != null) await _cleanupDownload(downloadedFile);
+    } catch (e) {
+      // 只在仍然挂载时处理真实错误
+      if (!mounted) return;
+      setState(() {
+        _state = _UpdateState.error;
+        _errorMessage = '安装失败，当前版本已保留';
+        _operationActive = false;
+      });
+    }
+    // 成功路径下临时 DMG 由原生安装器（AppDelegate/UpdateInstaller）清理；
+    // 安装成功后 App 会终止，不需要 Dart 侧再删除。
+  }
+
+  Future<void> _cleanupDownload(File file) async {
+    try {
+      final parent = file.parent;
+      if (await parent.exists()) {
+        final dirName = parent.uri.pathSegments.lastWhere(
+          (s) => s.isNotEmpty,
+          orElse: () => '',
+        );
+        if (dirName.startsWith('inbox-update_')) {
+          await parent.delete(recursive: true);
+        } else if (await file.exists()) {
+          await file.delete();
+        }
+      }
+    } catch (_) {
+      // 清理失败不影响主流程
     }
   }
 
@@ -153,7 +203,7 @@ class _UpdateViewState extends State<UpdateView> {
       case _UpdateState.current:
         return const _StatusText('当前已是最新版本');
       case _UpdateState.error:
-        return const _StatusText('校验失败，已保留当前版本');
+        return _StatusText(_errorMessage ?? '更新失败，请稍后重试');
     }
   }
 }

@@ -199,7 +199,15 @@ enum SettingsChannel {
           result(FlutterError(code: "BAD_ARGS", message: "installUpdate 需要 dmgPath", details: nil))
           return
         }
+        let dmgURL = URL(fileURLWithPath: dmgPath)
         UpdateInstaller.prepare(dmgPath: dmgPath) { installResult in
+          // 无论成功失败，清理下载的临时 DMG 及其目录
+          let tmpDir = dmgURL.deletingLastPathComponent()
+          if tmpDir.lastPathComponent.hasPrefix("inbox-update_") {
+            try? FileManager.default.removeItem(at: tmpDir)
+          } else {
+            try? FileManager.default.removeItem(at: dmgURL)
+          }
           switch installResult {
           case .success:
             result(nil)

@@ -118,7 +118,7 @@ void main() {
           size: 4,
         ),
       ),
-      throwsStateError,
+      throwsA(isA<UpdateException>()),
     );
     expect(directory.listSync(), isEmpty);
   });

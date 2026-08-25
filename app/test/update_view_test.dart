@@ -199,11 +199,11 @@ void main() {
     await tester.tap(find.text('下载并安装'));
     await tester.pump();
     service.failDownload(
-      StateError('Downloaded update checksum did not match'),
+      const UpdateException('下载文件校验失败，可能已损坏'),
     );
     await tester.pump();
 
-    expect(find.text('校验失败，已保留当前版本'), findsOneWidget);
+    expect(find.text('下载文件校验失败，可能已损坏'), findsOneWidget);
 
     await tester.tap(find.text('关闭'));
     expect(closes, 1);
