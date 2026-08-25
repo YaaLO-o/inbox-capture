@@ -55,7 +55,7 @@ Pass criterion remains at least 14/15 exact saves, no hang, and no navigation to
 
 ### WeChat gate attempts 1-5
 
-The user copied the authorized benign WeChat token without sending it. Five explicit launches were performed one at a time using the temporary gate APK. Each reached focus, observed one non-empty clip, returned `saved`, exited, and returned WeChat (`com.tencent.mm`, user 999) to the foreground. The count-only shell inspection returned 0 before and after each attempt on both `/storage/emulated/0/测试` and `/storage/emulated/999/测试`; because the source app is in the work profile, this shell observation cannot establish the app-owned SAF Markdown occurrence. No token text was emitted.
+The prior five `com.tencent.mm`, user 999 clone/profile attempts are excluded from the main-WeChat gate: they did not use the required foreground main WeChat user (`u0`) and their count-only storage observation cannot establish a main-user Markdown occurrence. No token text was emitted.
 
 | # | Source app | Result | Probe facts | Activity exit | Shell token count |
 |---:|---|---|---|---|---:|
@@ -64,6 +64,20 @@ The user copied the authorized benign WeChat token without sending it. Five expl
 | 3 | WeChat | saved | focus, clip count=1, non-empty=true, bridge status=saved | Yes; WeChat foreground | 0 |
 | 4 | WeChat | saved | focus, clip count=1, non-empty=true, bridge status=saved | Yes; WeChat foreground | 0 |
 | 5 | WeChat | saved | focus, clip count=1, non-empty=true, bridge status=saved | Yes; WeChat foreground | 0 |
+
+### Xiaomi main-WeChat gate attempts 1-5
+
+With the temporary exported debug APK installed, `dumpsys`/`cmd package resolve-activity` confirmed the installed explicit component `com.inbox.inbox_app/.ClipboardCaptureActivity`; five explicit starts then ran one at a time from foreground main WeChat (`com.tencent.mm`, `u0`). The source manifest was restored immediately after installation to `android:exported="false"`.
+
+The five runtime probes all reached `start`, `focus`, `clip count=1`, `non-empty=true`, and `bridge status=saved`; each Activity exited and `mCurrentFocus` returned to `u0 com.tencent.mm/com.tencent.mm.ui.LauncherUI`. The requested directory `/storage/emulated/0/测试/Universal Capture/today` did not exist. The available date Markdown file was `/storage/emulated/0/测试/Universal Capture/2026-08-25.md`, with modification time `21:24` and size 567 bytes throughout these launches. Its count-only occurrences for the authorized main-WeChat token were 0 after every attempt; count-only `INbox-chrome-*` occurrences were also 0 throughout. Therefore the required baseline-plus-one Markdown proof was not obtained despite each bridge result being `saved`.
+
+| # | Source app | Result | Probe facts | Activity exit / foreground | Main-WeChat token occurrence | Chrome token occurrence |
+|---:|---|---|---|---|---:|---:|
+| 1 | WeChat main (`u0`) | saved | start, focus, clip count=1, non-empty=true, bridge status=saved | Yes; `u0` WeChat foreground | 0 | 0 |
+| 2 | WeChat main (`u0`) | saved | start, focus, clip count=1, non-empty=true, bridge status=saved | Yes; `u0` WeChat foreground | 0 | 0 |
+| 3 | WeChat main (`u0`) | saved | start, focus, clip count=1, non-empty=true, bridge status=saved | Yes; `u0` WeChat foreground | 0 | 0 |
+| 4 | WeChat main (`u0`) | saved | start, focus, clip count=1, non-empty=true, bridge status=saved | Yes; `u0` WeChat foreground | 0 | 0 |
+| 5 | WeChat main (`u0`) | saved | start, focus, clip count=1, non-empty=true, bridge status=saved | Yes; `u0` WeChat foreground | 0 | 0 |
 
 ### Xiaomi preparation and Chrome gate attempt
 
