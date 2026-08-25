@@ -5,7 +5,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:inbox_app/models/capture.dart';
 import 'package:inbox_app/services/capture_service.dart';
 import 'package:inbox_app/services/clipboard_service.dart';
-import 'package:inbox_app/services/storage_service.dart';
+import 'package:inbox_app/services/desktop_file_vault_storage.dart';
+import 'package:inbox_app/services/markdown_formatter.dart';
+import 'package:inbox_app/services/vault_storage.dart';
 import 'package:inbox_app/util/id_gen.dart';
 import 'package:inbox_app/util/path_utils.dart';
 
@@ -17,13 +19,39 @@ class FakeClipboard implements ClipboardReader {
   Future<ClipboardContent> read() async => content;
 }
 
+class RecordingVaultStorage implements VaultStorage {
+  String? appendedMarkdown;
+
+  @override
+  Future<void> appendMarkdown(
+    String vaultId,
+    DateTime date,
+    String markdown,
+  ) async {
+    appendedMarkdown = markdown;
+  }
+
+  @override
+  Future<void> deleteAttachment(String vaultId, String fileName) async {}
+
+  @override
+  Future<void> ensureLayout(String vaultId) async {}
+
+  @override
+  Future<void> importAttachment(
+    String vaultId,
+    AttachmentSource source,
+    String fileName,
+  ) async {}
+}
+
 void main() {
   late Directory tmp;
-  late StorageService storage;
+  late DesktopFileVaultStorage storage;
 
   setUp(() {
     tmp = Directory.systemTemp.createTempSync('inbox_test_');
-    storage = StorageService();
+    storage = DesktopFileVaultStorage();
   });
 
   tearDown(() {
@@ -48,7 +76,7 @@ void main() {
     expect(VaultPaths.embedRef('image.png'), 'attachments/image.png');
   });
 
-  test('平台适配器输入相同 Capture 时生成完全相同的 Markdown', () {
+  test('平台适配器输入相同 Capture 时生成完全相同的 Markdown', () async {
     final now = DateTime(2026, 8, 21, 10, 32, 15);
     final macVault = Directory('${tmp.path}/macos')..createSync();
     final windowsVault = Directory('${tmp.path}/windows')..createSync();
@@ -65,8 +93,12 @@ void main() {
         ),
       ],
     );
-    storage.appendCapture(macVault.path, sharedCapture);
-    storage.appendCapture(windowsVault.path, sharedCapture);
+    final markdown = const MarkdownFormatter().format(sharedCapture);
+    final date = DateTime(now.year, now.month, now.day);
+    await storage.ensureLayout(macVault.path);
+    await storage.appendMarkdown(macVault.path, date, markdown);
+    await storage.ensureLayout(windowsVault.path);
+    await storage.appendMarkdown(windowsVault.path, date, markdown);
 
     expect(readInbox(macVault.path, now), readInbox(windowsVault.path, now));
   });
@@ -99,6 +131,33 @@ void main() {
     expect(md, contains('一段笔记内容')); // trim 生效
     expect(md, endsWith('---\n\n'));
   });
+
+  test(
+    'CaptureService awaits storage and appends the exact formatted Markdown',
+    () async {
+      final storage = RecordingVaultStorage();
+      final svc = CaptureService(
+        clipboard: FakeClipboard(const ClipboardContent(text: '  一段笔记内容  ')),
+        storage: storage,
+      );
+
+      final result = await svc.captureNow(
+        'vault-id',
+        now: DateTime(2026, 8, 24, 9, 30, 12),
+      );
+
+      expect(result.isSaved, isTrue);
+      expect(storage.appendedMarkdown, '''## 09:30
+
+<!-- capture:id=${result.captureId} -->
+
+一段笔记内容
+
+---
+
+''');
+    },
+  );
 
   test('连续 10 条：全部追加、不覆盖、顺序正确、ID 唯一', () async {
     final base = DateTime(2026, 8, 21, 9, 0, 0);

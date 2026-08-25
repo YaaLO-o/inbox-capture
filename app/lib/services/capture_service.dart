@@ -1,9 +1,8 @@
-import 'dart:io';
-
 import '../models/capture.dart';
 import '../util/id_gen.dart';
 import 'clipboard_service.dart';
-import 'storage_service.dart';
+import 'markdown_formatter.dart';
+import 'vault_storage.dart';
 
 /// 一次 Capture 的结果，用于 UI 反馈。
 enum CaptureStatus { saved, empty, error }
@@ -23,14 +22,14 @@ class CaptureResult {
 /// 不做任何分类/摘要（见《方案》第十、十六节）。
 class CaptureService {
   final ClipboardReader clipboard;
-  final StorageService storage;
+  final VaultStorage storage;
 
   /// 防止重复快速点击（见《方案》第十七节 测试 5）。
   DateTime? _lastCaptureAt;
 
   CaptureService({required this.clipboard, required this.storage});
 
-  Future<CaptureResult> captureNow(String vaultPath, {DateTime? now}) async {
+  Future<CaptureResult> captureNow(String vaultId, {DateTime? now}) async {
     final ts = now ?? DateTime.now();
 
     // 500ms 内的重复点击直接忽略，避免重复写入。
@@ -41,7 +40,7 @@ class CaptureService {
     _lastCaptureAt = ts;
 
     try {
-      storage.ensureVaultLayout(vaultPath);
+      await storage.ensureLayout(vaultId);
 
       final content = await clipboard.read();
       if (!content.hasContent) {
@@ -59,7 +58,11 @@ class CaptureService {
         final sanitizedExtension = _safeExtension(rawExtension);
         final ext = sanitizedExtension.isEmpty ? 'png' : sanitizedExtension;
         final fileName = '$id.$ext';
-        storage.writeAttachmentBytes(vaultPath, fileName, content.imageBytes!);
+        await storage.importAttachment(
+          vaultId,
+          BytesAttachmentSource(content.imageBytes!),
+          fileName,
+        );
         attachments.add(
           Attachment(
             id: id,
@@ -78,7 +81,11 @@ class CaptureService {
         final suffix = content.files.length > 1 ? '-$i' : '';
         final baseName = '$id$suffix${ext.isEmpty ? '' : '.$ext'}';
         try {
-          storage.copyAttachmentFile(vaultPath, src, baseName);
+          await storage.importAttachment(
+            vaultId,
+            FileAttachmentSource(src),
+            baseName,
+          );
           attachments.add(
             Attachment(
               id: '$id$suffix',
@@ -87,7 +94,7 @@ class CaptureService {
               displayName: _baseNameOf(src),
             ),
           );
-        } on FileSystemException catch (e) {
+        } on VaultStorageException catch (e) {
           // 单个文件复制失败不应让整个 Capture 崩溃；记录文字占位。
           // 这里不引入日志依赖，失败静默跳过该附件。
           // ignore: avoid_print
@@ -110,7 +117,15 @@ class CaptureService {
         return const CaptureResult(CaptureStatus.empty, message: '剪贴板为空');
       }
 
-      storage.appendCapture(vaultPath, capture);
+      await storage.appendMarkdown(
+        vaultId,
+        DateTime(
+          capture.createdAt.year,
+          capture.createdAt.month,
+          capture.createdAt.day,
+        ),
+        const MarkdownFormatter().format(capture),
+      );
       return CaptureResult(CaptureStatus.saved, captureId: id);
     } catch (e) {
       return CaptureResult(CaptureStatus.error, message: e.toString());

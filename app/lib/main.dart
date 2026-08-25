@@ -4,8 +4,8 @@ import 'models/app_release.dart';
 import 'services/app_command_service.dart';
 import 'services/capture_service.dart';
 import 'services/clipboard_service.dart';
+import 'services/desktop_file_vault_storage.dart';
 import 'services/settings_service.dart';
-import 'services/storage_service.dart';
 import 'services/update_service.dart';
 import 'ui/capture_pill.dart';
 import 'ui/onboarding_view.dart';
@@ -52,7 +52,7 @@ class _InboxAppState extends State<InboxApp> {
     _commands = widget.commandService ?? AppCommandService();
     _capture = CaptureService(
       clipboard: ClipboardService(),
-      storage: StorageService(),
+      storage: const DesktopFileVaultStorage(),
     );
     _commands.start(onCheckForUpdates: _showUpdates);
     _boot();
