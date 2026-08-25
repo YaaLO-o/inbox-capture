@@ -15,6 +15,11 @@ abstract interface class VaultStorage {
 }
 
 final class VaultStorageException implements Exception {
+  static const vaultUnavailable = 'vaultUnavailable';
+  static const permissionDenied = 'permissionDenied';
+  static const importFailed = 'importFailed';
+  static const appendFailed = 'appendFailed';
+
   final String code;
   final String message;
 

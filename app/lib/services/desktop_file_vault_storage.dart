@@ -13,7 +13,7 @@ final class DesktopFileVaultStorage implements VaultStorage {
       await Directory(VaultPaths.attachmentsDir(vaultId))
           .create(recursive: true);
     } on FileSystemException catch (error) {
-      throw VaultStorageException('vaultUnavailable', error.message);
+      throw _storageException(error, VaultStorageException.vaultUnavailable);
     }
   }
 
@@ -35,7 +35,7 @@ final class DesktopFileVaultStorage implements VaultStorage {
           throw UnsupportedError('URI attachment sources are not supported');
       }
     } on FileSystemException catch (error) {
-      throw VaultStorageException('importFailed', error.message);
+      throw _storageException(error, VaultStorageException.importFailed);
     }
   }
 
@@ -49,13 +49,36 @@ final class DesktopFileVaultStorage implements VaultStorage {
       await File(VaultPaths.dailyInboxFile(vaultId, date))
           .writeAsString(markdown, mode: FileMode.append, flush: true);
     } on FileSystemException catch (error) {
-      throw VaultStorageException('appendFailed', error.message);
+      throw _storageException(error, VaultStorageException.appendFailed);
     }
   }
 
   @override
   Future<void> deleteAttachment(String vaultId, String fileName) async {
     final file = File('${VaultPaths.attachmentsDir(vaultId)}/$fileName');
-    if (await file.exists()) await file.delete();
+    try {
+      if (await file.exists()) await file.delete();
+    } on FileSystemException catch (error) {
+      throw _storageException(error, VaultStorageException.vaultUnavailable);
+    }
+  }
+
+  VaultStorageException _storageException(
+    FileSystemException error,
+    String fallbackCode,
+  ) => VaultStorageException(
+    _isPermissionDenied(error)
+        ? VaultStorageException.permissionDenied
+        : fallbackCode,
+    error.message,
+  );
+
+  bool _isPermissionDenied(FileSystemException error) {
+    final errorCode = error.osError?.errorCode;
+    return errorCode == 1 ||
+        errorCode == 5 ||
+        errorCode == 13 ||
+        error.message.toLowerCase().contains('permission denied') ||
+        error.message.toLowerCase().contains('access denied');
   }
 }
