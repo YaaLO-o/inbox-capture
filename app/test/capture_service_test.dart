@@ -190,6 +190,64 @@ void main() {
     ]);
   });
 
+  test('shared image embeds while PDF video and ordinary files link', () async {
+    final storage = RecordingVaultStorage();
+    final service = CaptureService(
+      clipboard: FakeClipboard(const ClipboardContent()),
+      storage: storage,
+      idGenerator: (_) => 'id',
+    );
+
+    final result = await service.captureInput(
+      'vault',
+      const CaptureInput(
+        source: CaptureSource.share,
+        attachments: [
+          CaptureAttachmentInput(
+            source: UriAttachmentSource('content://provider/screenshot'),
+            extension: 'png',
+            mimeType: 'image/png',
+          ),
+          CaptureAttachmentInput(
+            source: UriAttachmentSource('content://provider/document'),
+            extension: 'pdf',
+            mimeType: 'application/pdf',
+            displayName: 'document.pdf',
+          ),
+          CaptureAttachmentInput(
+            source: UriAttachmentSource('content://provider/clip'),
+            extension: 'mp4',
+            mimeType: 'video/mp4',
+            displayName: 'clip.mp4',
+          ),
+          CaptureAttachmentInput(
+            source: UriAttachmentSource('content://provider/license'),
+            extension: '',
+            mimeType: 'application/octet-stream',
+            displayName: 'LICENSE',
+          ),
+        ],
+      ),
+      now: DateTime(2026, 8, 24, 9, 30, 12),
+    );
+
+    expect(result.status, CaptureStatus.saved);
+    expect(storage.appendedMarkdown, contains('![[attachments/id.png]]'));
+    expect(
+      storage.appendedMarkdown,
+      contains('[[attachments/id-1.pdf|document.pdf]]'),
+    );
+    expect(
+      storage.appendedMarkdown,
+      contains('[[attachments/id-2.mp4|clip.mp4]]'),
+    );
+    expect(storage.appendedMarkdown, contains('[[attachments/id-3|LICENSE]]'));
+    expect(
+      storage.appendedMarkdown,
+      isNot(contains('![[attachments/id-2.mp4]]')),
+    );
+  });
+
   test(
     'desktop two-file captures preserve zero-based attachment names',
     () async {
@@ -271,6 +329,7 @@ void main() {
       );
 
       expect(result.status, CaptureStatus.error);
+      expect(storage.events, isNot(contains(startsWith('append:'))));
       expect(storage.events.sublist(storage.events.length - 1), [
         'delete:20260824-093012-abcd.png',
       ]);

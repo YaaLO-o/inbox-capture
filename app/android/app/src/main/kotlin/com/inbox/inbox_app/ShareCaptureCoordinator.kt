@@ -16,7 +16,14 @@ internal class ShareCaptureCoordinator(
             mapOf(
                 "source" to "share",
                 "text" to request.text,
-                "attachments" to emptyList<Map<String, Any?>>(),
+                "attachments" to request.attachments.map { attachment ->
+                    mapOf(
+                        "uri" to attachment.uri.toString(),
+                        "displayName" to attachment.displayName,
+                        "mimeType" to attachment.mimeType,
+                        "extension" to attachment.extension,
+                    )
+                },
             ),
             ::complete,
         )

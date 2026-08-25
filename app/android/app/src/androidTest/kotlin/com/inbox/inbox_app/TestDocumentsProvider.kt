@@ -120,7 +120,7 @@ class TestDocumentsProvider : DocumentsProvider() {
             row,
             cursor,
             Document.COLUMN_MIME_TYPE,
-            if (file.isDirectory) Document.MIME_TYPE_DIR else "application/octet-stream",
+            if (file.isDirectory) Document.MIME_TYPE_DIR else mimeTypeFor(file.name),
         )
         addIfRequested(
             row,
@@ -162,6 +162,17 @@ class TestDocumentsProvider : DocumentsProvider() {
         value: Any,
     ) {
         if (cursor.getColumnIndex(column) != -1) row.add(column, value)
+    }
+
+    private fun mimeTypeFor(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
+        "png" -> "image/png"
+        "jpg", "jpeg" -> "image/jpeg"
+        "gif" -> "image/gif"
+        "webp" -> "image/webp"
+        "pdf" -> "application/pdf"
+        "mp4" -> "video/mp4"
+        "mov" -> "video/quicktime"
+        else -> "application/octet-stream"
     }
 
     companion object {
