@@ -13,10 +13,12 @@ Task 8 focused clipboard probe. The Activity is translucent, `noHistory`, and no
 | Build fingerprint | `google/sdk_gphone64_arm64/emu64a:16/BE2A.250530.026.F3/13894323:userdebug/dev-keys` |
 | APK | `flutter build apk --debug` passed; installed successfully |
 | Activity declaration | Installed manifest has `exported=false`, `noHistory=true`, `ClipboardCaptureTheme` |
-| Direct shell launch | Correctly denied by Android with `Permission Denial ... not exported`; this confirms the production entrypoint cannot be shell-launched as a workaround |
+| Direct shell launch | Correctly denied by Android with `Permission Denial ... not exported` |
+| App-UID `run-as` launch | Also denied. Exact error: `Permission Denial: package=com.android.shell does not belong to uid=10254`; `run-as` keeps the shell caller identity for ActivityManager on this API 36 image |
 | Automated probe checks | 3 focused JVM tests passed: focus-gated exact-once read, blank/empty finish, bridge result/finish-once |
 | Exact Markdown write | Not exercised from shell: no exported test launcher and no configured emulator Vault/clipboard injection path was used |
-| Probe log inspection | No production probe log was generated because the non-exported Activity was not shell-launched |
+| Visible source UI | Chrome was brought to the foreground and a known string was entered and copied through the visible address-bar UI |
+| Probe log inspection | No production probe log was generated because both shell and `run-as` ActivityManager launches were rejected |
 
 The non-exported Activity must be launched by the in-app overlay entrypoint in the later task or by an instrumented app-owned test. No exported/debug workaround was added.
 
