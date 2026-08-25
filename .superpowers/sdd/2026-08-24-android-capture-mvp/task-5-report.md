@@ -136,3 +136,42 @@ BUILD SUCCESSFUL
 ```
 
 Proportionate final verification also passed: complete API 36 connected instrumentation 9/9, Android `testDebugUnitTest`, focused Task 5 Dart tests 11/11, full Flutter tests 119/119, and `dart analyze lib test` with no issues.
+
+## Review fix round 2: confirm durable B before releasing A
+
+Re-review found that round 1 called asynchronous `SharedPreferences.apply()` for B and then released A. Process death in that window could leave the durable preference on A after A's URI grant had already been revoked.
+
+`VaultPreferences.save` now snapshots the prior descriptor and synchronously calls `commit()` for the new descriptor. A false commit result synchronously restores the prior descriptor snapshot and returns false. `AndroidVaultBridge` maps that false result to stable `VAULT_UNAVAILABLE`, cleans up only the newly taken B grant, and never reaches A release. `clearVault` is unchanged because this review is limited to atomic A to B replacement.
+
+The bridge instrumentation's SharedPreferences boundary simulates Android's important failure behavior: a failed commit may already have changed the in-memory map. It records persistence and grant events so the tests verify the consumer-visible sequence rather than source structure.
+
+### Review round 2 RED
+
+Before the production change, the focused API 36 run executed six tests and failed the two new durability regressions:
+
+```text
+Starting 6 tests on Pixel_6_API36(AVD) - 16
+
+successfulReselectionReleasesPreviousGrantAfterPersistingNewVault FAILED
+expected: [commit:B, release:A]
+actual:   [apply:B, release:A]
+
+commitFailureRestoresPreviousVaultAndGrantBeforeRemovingNewGrant FAILED
+expected stored Vault A, but Vault B remained in memory
+
+BUILD FAILED
+```
+
+### Review round 2 GREEN
+
+After the minimal synchronous save/rollback change, the same command passed all six bridge tests:
+
+```text
+Starting 6 tests on Pixel_6_API36(AVD) - 16
+Finished 6 tests on Pixel_6_API36(AVD) - 16
+BUILD SUCCESSFUL
+```
+
+The successful regression observes `commit:B` before `release:A`. The forced-failure regression observes `commit:B`, synchronous rollback `commit:A`, then `release:B`; it also asserts A remains stored and granted and B is not granted.
+
+Final verification passed: complete API 36 connected instrumentation 10/10, Android `testDebugUnitTest`, focused Task 5 Dart tests 11/11, full Flutter tests 119/119, and `dart analyze lib test` with no issues.

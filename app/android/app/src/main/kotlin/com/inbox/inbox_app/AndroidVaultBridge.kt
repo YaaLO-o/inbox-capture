@@ -88,7 +88,9 @@ class AndroidVaultBridge(
             val displayName = DocumentFile.fromTreeUri(context, picked.uri)?.name
                 ?: picked.uri.lastPathSegment
                 ?: "Vault"
-            preferences.save(picked.uri, displayName)
+            if (!preferences.save(picked.uri, displayName)) {
+                throw IllegalStateException("Could not persist Vault")
+            }
             releasePreviousPermission(previousUri, picked.uri)
             result.success(
                 mapOf(

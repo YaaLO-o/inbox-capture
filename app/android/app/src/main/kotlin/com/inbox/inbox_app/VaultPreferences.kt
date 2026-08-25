@@ -18,11 +18,22 @@ class VaultPreferences(private val context: Context) {
         return StoredVault(Uri.parse(treeUri), displayName)
     }
 
-    fun save(treeUri: Uri, displayName: String) {
-        preferences.edit()
+    fun save(treeUri: Uri, displayName: String): Boolean {
+        val previous = load()
+        val committed = preferences.edit()
             .putString(KEY_TREE_URI, treeUri.toString())
             .putString(KEY_DISPLAY_NAME, displayName)
-            .apply()
+            .commit()
+        if (committed) return true
+
+        val rollback = preferences.edit().clear()
+        if (previous != null) {
+            rollback
+                .putString(KEY_TREE_URI, previous.treeUri.toString())
+                .putString(KEY_DISPLAY_NAME, previous.displayName)
+        }
+        rollback.commit()
+        return false
     }
 
     fun clear() {
