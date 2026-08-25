@@ -89,6 +89,7 @@ class AndroidVaultBridge(
                 ?: picked.uri.lastPathSegment
                 ?: "Vault"
             preferences.save(picked.uri, displayName)
+            releasePreviousPermission(previousUri, picked.uri)
             result.success(
                 mapOf(
                     "id" to picked.uri.toString(),
@@ -160,6 +161,18 @@ class AndroidVaultBridge(
             context.contentResolver.releasePersistableUriPermission(uri, flags)
         } catch (_: SecurityException) {
             // No grant was persisted.
+        }
+    }
+
+    private fun releasePreviousPermission(previousUri: Uri?, currentUri: Uri) {
+        if (previousUri == null || previousUri == currentUri) return
+        try {
+            context.contentResolver.releasePersistableUriPermission(
+                previousUri,
+                REQUIRED_GRANT_FLAGS,
+            )
+        } catch (_: SecurityException) {
+            // The new Vault stays selected if Android already revoked the previous grant.
         }
     }
 

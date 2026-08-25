@@ -98,3 +98,41 @@ Reviewed the complete Task 5 diff against the plan and controller brief and ran 
 
 - `ProviderTestRule` is deprecated, but is retained as the controller-approved test-only mechanism for deterministic provider-backed file operations on Android 16.
 - The build emits existing Gradle/Kotlin and JDK native-access deprecation warnings; all requested builds and tests still exit successfully.
+
+## Review fix round 1: release the superseded Vault grant
+
+Review found that a successful Vault A to Vault B reselection persisted B but retained A's read/write URI grant. Clearing later released only B, leaving A granted indefinitely.
+
+Added bridge-level instrumentation using the real `AndroidVaultBridge`, `VaultPreferences`, `SafVaultStore`, and test `DocumentsProvider`; Android's permission bookkeeping is represented by a recording `MockContentResolver`. Coverage now proves:
+
+- successful A to B reselection persists and grants B, then releases A with both read and write flags;
+- cancellation leaves A stored and granted without any release;
+- a layout-validation failure removes only the newly taken B grant and leaves A stored and granted;
+- same-URI reselection retains the shared grant and performs no release.
+
+### Review RED
+
+Before the production fix, the focused API 36 run executed five tests and failed only the successful A to B regression because A remained granted:
+
+```text
+JAVA_HOME='/Applications/Android Studio.app/Contents/jbr/Contents/Home' \
+  ./gradlew connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=com.inbox.inbox_app.AndroidVaultBridgeTest
+
+Starting 5 tests on Pixel_6_API36(AVD) - 16
+successfulReselectionReleasesPreviousGrantAfterPersistingNewVault FAILED
+AndroidVaultBridgeTest.kt:75
+BUILD FAILED
+```
+
+### Review GREEN
+
+The minimal fix releases a different previous URI only after the new grant is taken, its layout is validated/created, and the new descriptor is saved. Previous-grant release uses the complete required read/write flags and is best-effort so a grant Android already revoked cannot undo the successfully persisted new selection.
+
+```text
+Starting 5 tests on Pixel_6_API36(AVD) - 16
+Finished 5 tests on Pixel_6_API36(AVD) - 16
+BUILD SUCCESSFUL
+```
+
+Proportionate final verification also passed: complete API 36 connected instrumentation 9/9, Android `testDebugUnitTest`, focused Task 5 Dart tests 11/11, full Flutter tests 119/119, and `dart analyze lib test` with no issues.
