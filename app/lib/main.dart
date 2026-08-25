@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import 'models/app_release.dart';
 import 'services/android_capture_dispatcher.dart';
+import 'services/android_saf_vault_storage.dart';
+import 'services/android_vault_settings.dart';
 import 'services/app_command_service.dart';
 import 'services/capture_service.dart';
 import 'services/clipboard_service.dart';
@@ -10,6 +12,7 @@ import 'services/desktop_file_vault_storage.dart';
 import 'services/settings_service.dart';
 import 'services/update_service.dart';
 import 'ui/capture_pill.dart';
+import 'ui/android_settings_view.dart';
 import 'ui/onboarding_view.dart';
 import 'ui/update_view.dart';
 import 'ui/window_sizes.dart';
@@ -17,11 +20,21 @@ import 'ui/window_sizes.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (defaultTargetPlatform == TargetPlatform.android) {
+    const settings = AndroidVaultSettings();
+    const storage = AndroidSafVaultStorage();
+    final capture = CaptureService(
+      clipboard: ClipboardService(),
+      storage: storage,
+    );
     await AndroidCaptureDispatcher(
-      vaultId: () async => null,
-      capture: (_, _) async =>
-          const CaptureResult(CaptureStatus.vaultUnavailable),
+      vaultId: () async {
+        final vault = await settings.getVault();
+        return vault?.accessible == true ? vault!.id : null;
+      },
+      capture: capture.captureInput,
     ).start();
+    runApp(const AndroidSettingsView(settings: settings));
+    return;
   }
   runApp(const InboxApp());
 }
