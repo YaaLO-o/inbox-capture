@@ -244,6 +244,17 @@ class SafVaultStore(private val context: Context) {
                 null,
             )
         } catch (_: FileNotFoundException) {
+            // Standard Android: querying a document URI that does not exist throws FNFE.
+            return null
+        } catch (error: IllegalArgumentException) {
+            // HyperOS ExternalStorageProvider wraps the same "no such file" condition
+            // in IllegalArgumentException ("Failed to determine if ... is child of ...:
+            // FileNotFoundException: Missing file for ... at /storage/...") when the
+            // direct-id target has never been created. Treat it as "absent" so the
+            // caller can create it. A genuinely malformed URI would indicate a
+            // programming error, but all ids here derive from provider-returned
+            // parent ids, so this exception only represents a missing child.
+            if (!error.causeChainContainsFileNotFoundException()) throw error
             return null
         } ?: return null
         cursor.use {
@@ -279,6 +290,15 @@ class SafVaultStore(private val context: Context) {
     private fun expectedFileMimeType(fileName: String, fallback: String): String {
         val extension = fileName.substringAfterLast('.', "").lowercase()
         return MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) ?: fallback
+    }
+
+    private fun Throwable.causeChainContainsFileNotFoundException(): Boolean {
+        var cause: Throwable? = this
+        while (cause != null) {
+            if (cause is FileNotFoundException) return true
+            cause = cause.cause
+        }
+        return false
     }
 
     companion object {

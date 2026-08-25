@@ -190,6 +190,52 @@ class SafVaultStoreTest {
         )
     }
 
+    // Regression for the 2026-08-26 P1: with the capture directory already
+    // present but the day's Markdown not yet created, HyperOS
+    // ExternalStorageProvider throws IllegalArgumentException(cause =
+    // FileNotFoundException) on a direct-id query for the missing file instead
+    // of FileNotFoundException. The first capture must still create the file;
+    // the second must append to it without producing a duplicate.
+    @Test
+    fun firstCaptureCreatesDailyMarkdownAndSecondAppendsUnderHyperOSMissingQuery() {
+        DocumentsContract.createDocument(
+            resolver,
+            rootDocumentUri,
+            "application/octet-stream",
+            TestDocumentsProvider.HYPEROS_ILLEGAL_ARGUMENT_SENTINEL,
+        )!!
+        val captureDirectory = DocumentsContract.createDocument(
+            resolver,
+            rootDocumentUri,
+            DocumentsContract.Document.MIME_TYPE_DIR,
+            "Universal Capture",
+        )!!
+        DocumentsContract.createDocument(
+            resolver,
+            captureDirectory,
+            DocumentsContract.Document.MIME_TYPE_DIR,
+            "attachments",
+        )!!
+
+        store.appendMarkdown(treeUri, "2026-08-26", "first-capture\n")
+        store.appendMarkdown(treeUri, "2026-08-26", "second-capture\n")
+
+        val markdown = child(captureDirectory, "2026-08-26.md")
+        assertTrue("2026-08-26.md must be created", markdown != null)
+        val markdownChildren = childNames(captureDirectory).filter {
+            it.startsWith("2026-08-26")
+        }
+        assertEquals(
+            "exactly one 2026-08-26 markdown file, no duplicate variant",
+            listOf("2026-08-26.md"),
+            markdownChildren,
+        )
+        assertEquals(
+            "first-capture\nsecond-capture\n",
+            resolver.openInputStream(markdown!!)!!.bufferedReader().use { it.readText() },
+        )
+    }
+
     private fun child(parent: Uri, displayName: String): Uri? {
         val parentDocumentId = DocumentsContract.getDocumentId(parent)
         val children = DocumentsContract.buildChildDocumentsUriUsingTree(

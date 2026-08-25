@@ -57,7 +57,18 @@ class TestDocumentsProvider : DocumentsProvider() {
         projection: Array<out String>?,
     ): Cursor = MatrixCursor(projection ?: DOCUMENT_COLUMNS).also { cursor ->
         val file = fileForId(documentId)
-        if (!file.exists()) throw FileNotFoundException("Unknown document $documentId")
+        if (!file.exists()) {
+            if (rootDirectory.resolve(HYPEROS_ILLEGAL_ARGUMENT_SENTINEL).exists()) {
+                // HyperOS ExternalStorageProvider wraps a missing direct-id query
+                // in IllegalArgumentException whose cause is FileNotFoundException,
+                // rather than throwing FileNotFoundException directly.
+                throw IllegalArgumentException(
+                    "Failed to determine if $documentId is child of $ROOT_DOCUMENT_ID",
+                    FileNotFoundException("Missing file for $documentId at ${file.absolutePath}"),
+                )
+            }
+            throw FileNotFoundException("Unknown document $documentId")
+        }
         includeDocument(cursor, file)
     }
 
@@ -199,6 +210,7 @@ class TestDocumentsProvider : DocumentsProvider() {
         const val REJECT_APPEND_SENTINEL = ".reject_append"
         const val XIAOMI_EMPTY_CHILD_QUERY_SENTINEL = ".xiaomi_empty_child_query"
         const val AUTO_RENAME_DIRECTORY_SENTINEL = ".auto_rename_directory"
+        const val HYPEROS_ILLEGAL_ARGUMENT_SENTINEL = ".hyperos_illegal_argument"
         private const val TEST_DIRECTORY = "saf-vault-test-documents"
 
         private val ROOT_COLUMNS = arrayOf(
