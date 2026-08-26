@@ -89,7 +89,9 @@ INbox 窗口保留 macOS 的红黄绿按钮。点红色关闭按钮只会隐藏�
 
 ### Android 个人侧载
 
-Android MVP 支持 Android 10（API 29）及以上，目前只提供个人侧载构建，不属于公开商店发布。安装 APK 后，在应用内用系统目录选择器授权 Obsidian Vault；INbox 只通过这份 SAF 授权写入 `Universal Capture/`，不要求整个存储空间权限。
+<a href="https://github.com/YaaLO-o/inbox-capture/releases"><b>⬇ 从 GitHub Releases 下载 Android APK</b></a>
+
+Android MVP 支持 Android 10（API 29）及以上，目前只提供个人侧载构建，不属于公开商店发布。下载后在手机上打开 APK 即可安装（可能需要在系统设置中允许“安装未知来源应用”）。安装 APK 后，在应用内用系统目录选择器授权 Obsidian Vault；INbox 只通过这份 SAF 授权写入 `Universal Capture/`，不要求整个存储空间权限。
 
 系统分享菜单支持文字、URL、单图、多图、PDF、视频和普通文件。悬浮球需要“显示在其他应用上层”权限；Android 13 及以上还需要通知权限来显示前台服务通知。悬浮球只在用户主动开启后运行，不监听后台剪贴板，也不随开机自动启动。
 
