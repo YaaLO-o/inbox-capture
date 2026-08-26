@@ -59,12 +59,14 @@ class TestDocumentsProvider : DocumentsProvider() {
         val file = fileForId(documentId)
         if (!file.exists()) {
             if (rootDirectory.resolve(HYPEROS_ILLEGAL_ARGUMENT_SENTINEL).exists()) {
-                // HyperOS ExternalStorageProvider wraps a missing direct-id query
-                // in IllegalArgumentException whose cause is FileNotFoundException,
-                // rather than throwing FileNotFoundException directly.
+                // HyperOS ExternalStorageProvider reports a missing direct-id query
+                // as IllegalArgumentException after the Binder boundary. The
+                // FileNotFoundException type survives only in the message; the
+                // deserialized exception has no cause.
                 throw IllegalArgumentException(
-                    "Failed to determine if $documentId is child of $ROOT_DOCUMENT_ID",
-                    FileNotFoundException("Missing file for $documentId at ${file.absolutePath}"),
+                    "Failed to determine if $documentId is child of $ROOT_DOCUMENT_ID: " +
+                        "java.io.FileNotFoundException: Missing file for $documentId " +
+                        "at ${file.absolutePath}",
                 )
             }
             throw FileNotFoundException("Unknown document $documentId")

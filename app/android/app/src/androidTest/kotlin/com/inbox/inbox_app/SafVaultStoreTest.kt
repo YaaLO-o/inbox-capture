@@ -192,10 +192,10 @@ class SafVaultStoreTest {
 
     // Regression for the 2026-08-26 P1: with the capture directory already
     // present but the day's Markdown not yet created, HyperOS
-    // ExternalStorageProvider throws IllegalArgumentException(cause =
-    // FileNotFoundException) on a direct-id query for the missing file instead
-    // of FileNotFoundException. The first capture must still create the file;
-    // the second must append to it without producing a duplicate.
+    // ExternalStorageProvider returns IllegalArgumentException with no cause on
+    // a direct-id query for the missing file. Its message includes the remote
+    // FileNotFoundException details. The first capture must still create the
+    // file; the second must append to it without producing a duplicate.
     @Test
     fun firstCaptureCreatesDailyMarkdownAndSecondAppendsUnderHyperOSMissingQuery() {
         DocumentsContract.createDocument(
