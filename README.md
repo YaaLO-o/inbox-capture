@@ -4,10 +4,11 @@
 
 **把任何平台看到的东西，一键收进你的 Obsidian。**
 
-一个本地优先、不上传、不后台监听的桌面采集 Inbox。用一个像素宝箱怪作为桌面入口，复制完点一下，文字、图片、文件就写进你自己的库。
+一个本地优先、不上传、不后台监听的采集 Inbox。桌面端用像素宝箱怪作为入口；Android 可从系统分享菜单发送文字、图片和文件，也可点悬浮球读取当前剪贴板。内容直接写进你自己的库。
 
 <div>
     <a href="#安装"><img alt="macOS" src="https://img.shields.io/badge/-macOS%20Universal-black?style=flat-square&logo=apple&logoColor=white" /></a>
+    <a href="#android-个人侧载"><img alt="Android" src="https://img.shields.io/badge/-Android%2010%2B-3DDC84?style=flat-square&logo=android&logoColor=white" /></a>
     <a href="https://github.com/YaaLO-o/inbox-capture/releases"><img alt="Windows" src="https://img.shields.io/badge/-Windows%20%E8%A7%84%E5%88%92%E4%B8%AD-blue?style=flat-square&logo=windows&logoColor=white" /></a>
 </div>
 
@@ -86,6 +87,14 @@ curl -fsSL https://raw.githubusercontent.com/YaaLO-o/inbox-capture/main/scripts/
 
 INbox 窗口保留 macOS 的红黄绿按钮。点红色关闭按钮只会隐藏窗口，应用会继续运行。需要重新打开时，点菜单栏里的 INbox 图标，再点「显示 INbox」。需要结束进程时，请点「完全退出」。
 
+### Android 个人侧载
+
+Android MVP 支持 Android 10（API 29）及以上，目前只提供个人侧载构建，不属于公开商店发布。安装 APK 后，在应用内用系统目录选择器授权 Obsidian Vault；INbox 只通过这份 SAF 授权写入 `Universal Capture/`，不要求整个存储空间权限。
+
+系统分享菜单支持文字、URL、单图、多图、PDF、视频和普通文件。悬浮球需要“显示在其他应用上层”权限；Android 13 及以上还需要通知权限来显示前台服务通知。悬浮球只在用户主动开启后运行，不监听后台剪贴板，也不随开机自动启动。
+
+当前 Android MVP 已在 Xiaomi 13 Pro（Android 16 / HyperOS OS3.0.310.0.WMBCNXM）和 Pixel 6 API 36 模拟器验收。完整范围、测试结果和已知 P2 见 [Android MVP 验证记录](docs/android-mvp-verification.md)。
+
 ## 数据存在哪
 
 INbox 把内容写进你选择的 Obsidian Vault：
@@ -139,6 +148,7 @@ sh scripts/release_macos.sh 1.1.1
 ## 路线图
 
 - ✅ macOS 文字 / 图片 / 文件采集，像素桌宠入口
+- ✅ Android 文字 / 图片 / 文件系统分享与剪贴板悬浮球 MVP（个人侧载）
 - 🚧 Windows 适配（代码已完成，待真机首次编译验证）
 - ⏳ AI 分类、标签、摘要、语义搜索（基于 `capture:id`）
 - ⏳ Apple Developer ID 签名与公证，免去首次打开提示

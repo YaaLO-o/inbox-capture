@@ -1136,7 +1136,7 @@ git commit -m "feat: add Android floating capture bubble"
 - Produces the final verified feature matrix and manual-test record.
 - Does not change runtime interfaces.
 
-- [ ] **Step 1: Run the complete static and automated suite from a clean state**
+- [x] **Step 1: Run the complete static and automated suite from a clean state**
 
 Run:
 
@@ -1154,11 +1154,11 @@ cd android
 
 Expected: every command exits 0. Record tool versions, test totals, device IDs, and artifact paths in `docs/android-mvp-verification.md`.
 
-- [ ] **Step 2: Run the emulator matrix**
+- [x] **Step 2: Run the emulator matrix**
 
 Install the clean APK and verify Vault selection, persisted access, text Capture, repeated Capture, Share text/image/file, overlay switch, drag, permission denial, and App restart. Record pass/fail per item; do not summarize an unrun item as passed.
 
-- [ ] **Step 3: Run the Xiaomi 13 Pro and Obsidian matrix**
+- [x] **Step 3: Run the Xiaomi 13 Pro and Obsidian matrix**
 
 Select an actual Android Obsidian Vault, then verify in order:
 
@@ -1176,11 +1176,13 @@ Select an actual Android Obsidian Vault, then verify in order:
 
 Record actual filenames and redacted Markdown examples. Any failure reopens the owning task; fix it with a new failing regression test before changing code.
 
-- [ ] **Step 4: Update public and project documentation**
+- [x] **Step 4: Update public and project documentation**
 
 Document Android API 29+, personal sideload status, SAF selection, supported Share MIME categories, overlay/notification permissions, no boot auto-start, and the exact verified device/system. Keep unverified claims explicitly labeled.
 
-- [ ] **Step 5: Re-run final checks after documentation and commit**
+- [x] **Step 5: Re-run final checks after documentation and commit**
+
+Final closeout scope was narrowed by the user: after removing the manual instrumentation harness, API 36 `connectedDebugAndroidTest` passed 28/28 with no skips or failures. Runtime code had not changed since the clean full suite, so Flutter, macOS, real-device Share, Obsidian, P1, and the full Android matrix were not repeated.
 
 Run `git diff --check`, `dart analyze lib test`, `flutter test`, `flutter build apk --debug`, and `flutter build macos --debug` again. Expected: clean output and all exit 0.
 
@@ -1191,7 +1193,7 @@ git add README.md PROJECT_STATE.md app/README.md docs/android-mvp-verification.m
 git commit -m "docs: verify Android Capture MVP"
 ```
 
-- [ ] **Step 6: Prepare the final report and stop**
+- [x] **Step 6: Prepare the final report and stop**
 
 Run:
 
