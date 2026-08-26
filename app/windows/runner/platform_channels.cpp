@@ -20,6 +20,7 @@ constexpr char kClipboardChannel[] = "com.inbox.app/clipboard";
 constexpr char kSettingsChannel[] = "com.inbox.app/settings";
 constexpr wchar_t kRegistryKey[] = L"Software\\INbox";
 constexpr wchar_t kVaultValue[] = L"VaultPath";
+constexpr wchar_t kDisplayMethodValue[] = L"DisplayMethod";
 
 class ScopedClipboard {
  public:
@@ -315,6 +316,47 @@ void ClearVaultPath() {
   }
 }
 
+std::optional<std::string> ReadRegistryString(const wchar_t* value_name) {
+  DWORD bytes = 0;
+  if (RegGetValueW(HKEY_CURRENT_USER, kRegistryKey, value_name,
+                   RRF_RT_REG_SZ, nullptr, nullptr, &bytes) != ERROR_SUCCESS ||
+      bytes < sizeof(wchar_t)) {
+    return std::nullopt;
+  }
+  std::vector<wchar_t> value(bytes / sizeof(wchar_t), L'\0');
+  if (RegGetValueW(HKEY_CURRENT_USER, kRegistryKey, value_name,
+                   RRF_RT_REG_SZ, nullptr, value.data(), &bytes) != ERROR_SUCCESS) {
+    return std::nullopt;
+  }
+  const std::string s = Utf8FromUtf16(value.data());
+  return s.empty() ? std::nullopt : std::optional<std::string>(s);
+}
+
+bool WriteRegistryString(const wchar_t* value_name, const std::string& s) {
+  const std::wstring wide = WideFromUtf8(s);
+  if (wide.empty()) {
+    return false;
+  }
+  HKEY key = nullptr;
+  if (RegCreateKeyExW(HKEY_CURRENT_USER, kRegistryKey, 0, nullptr, 0,
+                      KEY_SET_VALUE, nullptr, &key, nullptr) != ERROR_SUCCESS) {
+    return false;
+  }
+  const DWORD bytes = static_cast<DWORD>((wide.size() + 1) * sizeof(wchar_t));
+  const LSTATUS status = RegSetValueExW(
+      key, value_name, 0, REG_SZ,
+      reinterpret_cast<const BYTE*>(wide.c_str()), bytes);
+  RegCloseKey(key);
+  return status == ERROR_SUCCESS;
+}
+
+bool ShellOpen(const wchar_t* action, const std::wstring& target) {
+  const HINSTANCE result =
+      ShellExecuteW(nullptr, action, target.c_str(), nullptr, nullptr,
+                    SW_SHOWNORMAL);
+  return reinterpret_cast<INT_PTR>(result) > 32;
+}
+
 std::optional<std::string> PickFolder(HWND window) {
   IFileOpenDialog* dialog = nullptr;
   if (CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
@@ -324,7 +366,7 @@ std::optional<std::string> PickFolder(HWND window) {
   DWORD options = 0;
   dialog->GetOptions(&options);
   dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
-  dialog->SetTitle(L"选择你的 Obsidian Vault 文件夹");
+  dialog->SetTitle(L"选择采集内容的存储文件夹");
   if (dialog->Show(window) != S_OK) {
     dialog->Release();
     return std::nullopt;
@@ -421,6 +463,65 @@ void PlatformChannels::HandleSettingsCall(
   if (method == "clearVaultPath") {
     ClearVaultPath();
     result->Success();
+    return;
+  }
+  if (method == "getDisplayMethod") {
+    if (const auto method_value = ReadRegistryString(kDisplayMethodValue)) {
+      result->Success(flutter::EncodableValue(*method_value));
+    } else {
+      result->Success();
+    }
+    return;
+  }
+  if (method == "setDisplayMethod") {
+    const auto* value = Argument(ArgumentsMap(call), "method");
+    const auto* method_value =
+        value == nullptr ? nullptr : std::get_if<std::string>(value);
+    if (method_value == nullptr ||
+        (*method_value != "inbox" && *method_value != "system" &&
+         *method_value != "obsidian")) {
+      result->Error("BAD_ARGS", "setDisplayMethod 需要 method ∈ inbox|system|obsidian");
+    } else {
+      WriteRegistryString(kDisplayMethodValue, *method_value);
+      result->Success();
+    }
+    return;
+  }
+  if (method == "revealPath" || method == "openPath") {
+    const auto* value = Argument(ArgumentsMap(call), "path");
+    const auto* path =
+        value == nullptr ? nullptr : std::get_if<std::string>(value);
+    if (path == nullptr) {
+      result->Error("BAD_ARGS", "需要 path");
+      return;
+    }
+    const std::wstring wide = WideFromUtf8(*path);
+    const wchar_t* action = method == "revealPath" ? L"explore" : L"open";
+    result->Success(flutter::EncodableValue(ShellOpen(action, wide)));
+    return;
+  }
+  if (method == "openExternalUrl") {
+    const auto* value = Argument(ArgumentsMap(call), "url");
+    const auto* url =
+        value == nullptr ? nullptr : std::get_if<std::string>(value);
+    if (url == nullptr) {
+      result->Error("BAD_ARGS", "需要 url");
+      return;
+    }
+    const std::wstring wide = WideFromUtf8(*url);
+    result->Success(flutter::EncodableValue(ShellOpen(L"open", wide)));
+    return;
+  }
+  if (method == "setWindowMode") {
+    // Windows 暂无独立的标准窗口样式，复用现有无边框/置顶窗口；
+    // 控制中心/阅读器靠 Dart 侧的 in-view 返回按钮关闭。
+    result->Success();
+    return;
+  }
+  if (method == "getAppVersion") {
+    // Windows 版本读取当前未接入，Dart 端会把缺失当作 MISSING_VERSION；
+    // 返回 NotImplemented 让测试/调用方明确知道未实现，避免误判。
+    result->NotImplemented();
     return;
   }
   if (method == "pickFolder") {

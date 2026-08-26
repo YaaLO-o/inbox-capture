@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'models/app_release.dart';
 import 'services/capture_service.dart';
 import 'services/clipboard_service.dart';
+import 'services/display_service.dart';
 import 'services/settings_service.dart';
 import 'services/storage_service.dart';
 import 'services/update_service.dart';
 import 'ui/capture_pill.dart';
+import 'ui/control_center_view.dart';
+import 'ui/note_reader_view.dart';
 import 'ui/onboarding_view.dart';
 import 'ui/update_view.dart';
 import 'ui/window_sizes.dart';
@@ -30,26 +33,49 @@ class InboxApp extends StatefulWidget {
   State<InboxApp> createState() => _InboxAppState();
 }
 
+/// 更新页是从哪里进入的——决定关闭后回到桌宠还是控制中心。
+enum _UpdateOrigin { pill, controlCenter }
+
 class _InboxAppState extends State<InboxApp> {
   late final SettingsService _settings;
   late final CaptureService _capture;
   late final UpdateService _updates;
+  late final StorageService _storage;
+  late final DisplayService _display;
 
   String? _vaultPath;
   AppVersion? _currentVersion;
   bool _loading = true;
   bool _showingUpdate = false;
+  bool _showingControlCenter = false;
+  bool _showingReader = false;
+  _UpdateOrigin _updateOrigin = _UpdateOrigin.pill;
 
   @override
   void initState() {
     super.initState();
     _settings = widget.settings ?? SettingsService();
     _updates = widget.updateService ?? UpdateService();
+    _storage = StorageService();
+    _display = DisplayService(settings: _settings);
     _capture = CaptureService(
       clipboard: ClipboardService(),
-      storage: StorageService(),
+      storage: _storage,
     );
+    // 原生红叉把标准窗口切回悬浮宠物时，复位 Dart 侧的模式状态。
+    _settings.setMainWindowClosedHandler(_onNativeWindowClosed);
     _boot();
+  }
+
+  /// 原生关闭按钮 → 悬浮宠物：标准窗口相关模式全部复位。
+  void _onNativeWindowClosed() {
+    if (!mounted) return;
+    setState(() {
+      _showingControlCenter = false;
+      _showingReader = false;
+      _showingUpdate = false;
+      _currentVersion = null;
+    });
   }
 
   Future<void> _boot() async {
@@ -93,26 +119,37 @@ class _InboxAppState extends State<InboxApp> {
     }
   }
 
-  Future<void> _showUpdates() async {
+  Future<void> _showUpdates({_UpdateOrigin origin = _UpdateOrigin.pill}) async {
     await _settings.showWindow();
-    await _settings.setWindowSize(
-      WindowSizes.updateWidth,
-      WindowSizes.updateHeight,
-      animate: false,
-    );
+    if (origin == _UpdateOrigin.pill) {
+      // 从桌宠进入：放大到更新页尺寸（仍为悬浮窗口）。
+      await _settings.setWindowSize(
+        WindowSizes.updateWidth,
+        WindowSizes.updateHeight,
+        animate: false,
+      );
+    }
+    // 从控制中心进入：窗口已是 standard 模式，保持当前尺寸只换内容。
     final version = await _settings.getAppVersion();
     if (!mounted) return;
     setState(() {
+      _updateOrigin = origin;
       _currentVersion = version;
       _showingUpdate = true;
     });
   }
 
   Future<void> _closeUpdates() async {
+    final origin = _updateOrigin;
     setState(() {
       _showingUpdate = false;
       _currentVersion = null;
     });
+
+    if (origin == _UpdateOrigin.controlCenter) {
+      // 回到控制中心，窗口保持 standard 模式与控制中心尺寸。
+      return;
+    }
 
     final path = _vaultPath;
     if (path != null) {
@@ -128,6 +165,49 @@ class _InboxAppState extends State<InboxApp> {
         animate: false,
       );
     }
+  }
+
+  // 控制中心：标准 macOS 窗口，桌宠暂时隐藏。
+  Future<void> _openControlCenter() async {
+    final path = _vaultPath;
+    if (path == null) return;
+    await _settings.setWindowSize(
+      WindowSizes.controlCenterWidth,
+      WindowSizes.controlCenterHeight,
+      animate: false,
+    );
+    await _settings.setWindowMode('standard');
+    if (!mounted) return;
+    setState(() => _showingControlCenter = true);
+  }
+
+  Future<void> _closeControlCenter() async {
+    setState(() {
+      _showingControlCenter = false;
+      _showingReader = false;
+    });
+    await _settings.setWindowMode('floating');
+    await _settings.setWindowSize(
+      WindowSizes.pillWidth,
+      WindowSizes.pillHeight,
+      animate: false,
+    );
+  }
+
+  void _openReader() {
+    _settings.setWindowSize(
+      WindowSizes.readerWidth,
+      WindowSizes.readerHeight,
+    );
+    setState(() => _showingReader = true);
+  }
+
+  void _closeReader() {
+    _settings.setWindowSize(
+      WindowSizes.controlCenterWidth,
+      WindowSizes.controlCenterHeight,
+    );
+    setState(() => _showingReader = false);
   }
 
   @override
@@ -158,6 +238,26 @@ class _InboxAppState extends State<InboxApp> {
       );
     }
 
+    if (_showingReader && _vaultPath != null) {
+      return NoteReaderView(
+        vaultPath: _vaultPath!,
+        onBack: _closeReader,
+      );
+    }
+
+    if (_showingControlCenter && _vaultPath != null) {
+      return ControlCenterView(
+        vaultPath: _vaultPath!,
+        settings: _settings,
+        storage: _storage,
+        display: _display,
+        onVaultPathChanged: (p) => setState(() => _vaultPath = p),
+        onCheckUpdates: () => _showUpdates(origin: _UpdateOrigin.controlCenter),
+        onOpenContent: _openReader,
+        onClose: _closeControlCenter,
+      );
+    }
+
     final path = _vaultPath;
     if (path == null) {
       return OnboardingView(
@@ -171,6 +271,7 @@ class _InboxAppState extends State<InboxApp> {
       capture: _capture,
       onChangeVault: _changeVault,
       onCheckUpdates: _showUpdates,
+      onOpenControlCenter: _openControlCenter,
     );
   }
 }

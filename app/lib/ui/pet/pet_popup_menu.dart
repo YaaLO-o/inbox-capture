@@ -6,12 +6,14 @@ import 'package:flutter/material.dart';
 /// 避免透明窗口下文字与背景同色导致不可读。
 /// 宽度与桌宠窗口一致（132），展开时窗口仅向下增高。
 class PetPopupMenu extends StatelessWidget {
+  final VoidCallback? onOpenControlCenter;
   final VoidCallback? onSelectVault;
   final VoidCallback? onCheckUpdates;
   final VoidCallback? onQuit;
 
   const PetPopupMenu({
     super.key,
+    this.onOpenControlCenter,
     this.onSelectVault,
     this.onCheckUpdates,
     this.onQuit,
@@ -19,7 +21,7 @@ class PetPopupMenu extends StatelessWidget {
 
   static const double menuWidth = 132;
   static const double itemHeight = 44;
-  static const double menuHeight = itemHeight * 3;
+  static const double menuHeight = itemHeight * 4;
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +43,12 @@ class PetPopupMenu extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _MenuItem(
-            label: '重新选择 Vault',
+            label: '控制中心',
+            onTap: onOpenControlCenter,
+            showDivider: true,
+          ),
+          _MenuItem(
+            label: '更改存储文件夹',
             onTap: onSelectVault,
             showDivider: true,
           ),

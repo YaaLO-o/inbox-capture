@@ -41,7 +41,7 @@ echo "==> flutter pub get"
 (cd "$APP_DIR" && flutter pub get >/dev/null)
 
 echo "==> flutter build macos --release (universal)"
-(cd "$APP_DIR" && flutter build macos --release --build-name "$VERSION" --build-number 2)
+(cd "$APP_DIR" && flutter build macos --release --build-name "$VERSION" --build-number 3)
 
 if [ ! -d "$RELEASE_APP" ]; then
   echo "Release app not found after build: $RELEASE_APP" >&2

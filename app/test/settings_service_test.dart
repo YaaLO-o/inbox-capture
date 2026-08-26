@@ -94,4 +94,78 @@ void main() {
 
     expect(calls.single.method, 'showWindow');
   });
+
+  test('displayMethod round-trips through the native boundary', () async {
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'getDisplayMethod') return 'obsidian';
+      return null;
+    });
+
+    final settings = SettingsService();
+    expect(await settings.getDisplayMethod(), 'obsidian');
+    await settings.setDisplayMethod('system');
+
+    expect(calls.map((c) => c.method), ['getDisplayMethod', 'setDisplayMethod']);
+    expect(calls[1].arguments, {'method': 'system'});
+  });
+
+  test('revealPath / openPath / openExternalUrl / setWindowMode pass args',
+      () async {
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
+      if (call.method == 'revealPath' ||
+          call.method == 'openPath' ||
+          call.method == 'openExternalUrl') {
+        return true;
+      }
+      return null;
+    });
+
+    final settings = SettingsService();
+    expect(await settings.revealPath('/tmp/vault'), isTrue);
+    expect(await settings.openPath('/tmp/vault/note.md'), isTrue);
+    expect(await settings.openExternalUrl('obsidian://open?path=x'), isTrue);
+    await settings.setWindowMode('standard');
+
+    expect(calls.map((c) => c.method), [
+      'revealPath',
+      'openPath',
+      'openExternalUrl',
+      'setWindowMode',
+    ]);
+    expect(calls[0].arguments, {'path': '/tmp/vault'});
+    expect(calls[1].arguments, {'path': '/tmp/vault/note.md'});
+    expect(calls[2].arguments, {'url': 'obsidian://open?path=x'});
+    expect(calls[3].arguments, {'mode': 'standard'});
+  });
+
+  test('openExternalUrl returns false when native reports no handler app',
+      () async {
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      if (call.method == 'openExternalUrl') return false;
+      throw PlatformException(code: 'UNEXPECTED', message: call.method);
+    });
+
+    expect(await SettingsService().openExternalUrl('obsidian://open?path=x'),
+        isFalse);
+  });
+
+  test('mainWindowDidClose inbound call invokes registered handler', () async {
+    var fired = false;
+    SettingsService().setMainWindowClosedHandler(() => fired = true);
+
+    // 模拟原生 → Dart 的入向调用。
+    await messenger.handlePlatformMessage(
+      channel.name,
+      channel.codec.encodeMethodCall(
+        const MethodCall('mainWindowDidClose'),
+      ),
+      (_) {},
+    );
+
+    expect(fired, isTrue);
+  });
 }

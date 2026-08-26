@@ -18,6 +18,7 @@ class CapturePill extends StatefulWidget {
   final CaptureService capture;
   final void Function() onChangeVault;
   final void Function() onCheckUpdates;
+  final void Function() onOpenControlCenter;
 
   const CapturePill({
     super.key,
@@ -25,6 +26,7 @@ class CapturePill extends StatefulWidget {
     required this.capture,
     required this.onChangeVault,
     required this.onCheckUpdates,
+    required this.onOpenControlCenter,
   });
 
   @override
@@ -124,6 +126,10 @@ class _CapturePillState extends State<CapturePill> {
                     top: WindowSizes.pillHeight + _menuGap,
                     left: 0,
                     child: PetPopupMenu(
+                      onOpenControlCenter: () {
+                        _closeMenu();
+                        widget.onOpenControlCenter();
+                      },
                       onSelectVault: () {
                         _closeMenu();
                         widget.onChangeVault();

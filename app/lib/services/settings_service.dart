@@ -4,9 +4,9 @@ import 'package:flutter/services.dart';
 
 import '../models/app_release.dart';
 
-/// Vault 路径等设置的持久化。
+/// 存储文件夹路径、默认展示方式等设置的持久化。
 ///
-/// 原生层负责平台持久化；Vault 是否仍然存在由这里统一验证。
+/// 原生层负责平台持久化；存储文件夹是否仍然存在由这里统一验证。
 class SettingsService {
   static const _channel = MethodChannel('com.inbox.app/settings');
 
@@ -21,6 +21,14 @@ class SettingsService {
 
   Future<void> clearVaultPath() => _channel.invokeMethod('clearVaultPath');
 
+  /// 默认展示方式：应用内只读查看（inbox）/ 系统默认 Markdown 应用（system）/ Obsidian。
+  /// 原生层未保存或保存了未知值时返回 null，由上层回落为 inbox。
+  Future<String?> getDisplayMethod() =>
+      _channel.invokeMethod<String>('getDisplayMethod');
+
+  Future<void> setDisplayMethod(String method) =>
+      _channel.invokeMethod('setDisplayMethod', {'method': method});
+
   /// 只恢复仍然存在的目录。验证过程绝不创建路径。
   Future<String?> loadValidVaultPath() async {
     final path = await getVaultPath();
@@ -30,9 +38,38 @@ class SettingsService {
     return null;
   }
 
-  /// 弹出原生 NSOpenPanel 让用户选择一个目录（Obsidian Vault）。
+  /// 弹出原生 NSOpenPanel 让用户选择一个目录。
   /// 返回选中的绝对路径，取消时返回 null。
   Future<String?> pickFolder() => _channel.invokeMethod<String>('pickFolder');
+
+  /// 在系统文件管理器中定位到该文件夹（Finder 打开此目录）。
+  Future<bool> revealPath(String path) async =>
+      await _channel.invokeMethod<bool>('revealPath', {'path': path}) ?? false;
+
+  /// 用系统默认应用打开文件（例如 Markdown 文件）。
+  Future<bool> openPath(String path) async =>
+      await _channel.invokeMethod<bool>('openPath', {'path': path}) ?? false;
+
+  /// 用能处理该 URL scheme 的应用打开外部链接。
+  /// 无应用可处理时原生层返回 false（例如未安装 Obsidian 时打开 obsidian://）。
+  Future<bool> openExternalUrl(String url) async =>
+      await _channel.invokeMethod<bool>('openExternalUrl', {'url': url}) ??
+      false;
+
+  /// 切换原生窗口外观：standard（带标题栏红叉、普通层级）或 floating（悬浮宠物）。
+  Future<void> setWindowMode(String mode) =>
+      _channel.invokeMethod('setWindowMode', {'mode': mode});
+
+  /// 原生红叉把标准窗口切回悬浮宠物时回调。
+  ///
+  /// 注意：MethodChannel 只支持一个 Dart 侧 handler；本应用 settings 通道
+  /// 目前没有其他入向调用，注册这里是安全的。
+  void setMainWindowClosedHandler(void Function() handler) {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method == 'mainWindowDidClose') handler();
+      return null;
+    });
+  }
 
   Future<AppVersion> getAppVersion() async {
     final value = await _channel.invokeMethod<String>('getAppVersion');

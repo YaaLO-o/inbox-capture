@@ -101,10 +101,15 @@ enum ClipboardChannel {
 enum SettingsChannel {
   static let channelName = "com.inbox.app/settings"
   private static let vaultKey = "vaultPath"
+  private static let displayMethodKey = "displayMethod"
+  private static let validDisplayMethods: Set<String> = ["inbox", "system", "obsidian"]
   private static var windowDragSession: WindowDragSession?
+  /// 保留 channel 引用以支持原生 → Dart 反向调用（mainWindowDidClose）。
+  private static var channel: FlutterMethodChannel?
 
   static func register(with controller: FlutterViewController) {
     let channel = FlutterMethodChannel(name: channelName, binaryMessenger: controller.engine.binaryMessenger)
+    self.channel = channel
     channel.setMethodCallHandler { call, result in
       switch call.method {
       case "getVaultPath":
@@ -119,8 +124,70 @@ enum SettingsChannel {
       case "clearVaultPath":
         UserDefaults.standard.removeObject(forKey: vaultKey)
         result(nil)
+      case "getDisplayMethod":
+        result(UserDefaults.standard.string(forKey: displayMethodKey))
+      case "setDisplayMethod":
+        guard let args = call.arguments as? [String: Any],
+              let method = args["method"] as? String,
+              validDisplayMethods.contains(method) else {
+          result(FlutterError(code: "BAD_ARGS",
+                              message: "setDisplayMethod 需要 method ∈ inbox|system|obsidian",
+                              details: nil))
+          return
+        }
+        UserDefaults.standard.set(method, forKey: displayMethodKey)
+        result(nil)
       case "pickFolder":
         result(pickFolder())
+      case "revealPath":
+        guard let args = call.arguments as? [String: Any],
+              let path = args["path"] as? String else {
+          result(FlutterError(code: "BAD_ARGS", message: "revealPath 需要 path", details: nil))
+          return
+        }
+        let ok = NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: path)
+        result(ok)
+      case "openPath":
+        guard let args = call.arguments as? [String: Any],
+              let path = args["path"] as? String else {
+          result(FlutterError(code: "BAD_ARGS", message: "openPath 需要 path", details: nil))
+          return
+        }
+        result(NSWorkspace.shared.open(URL(fileURLWithPath: path)))
+      case "openExternalUrl":
+        guard let args = call.arguments as? [String: Any],
+              let urlString = args["url"] as? String,
+              let url = URL(string: urlString) else {
+          result(FlutterError(code: "BAD_ARGS", message: "openExternalUrl 需要合法 url", details: nil))
+          return
+        }
+        // 先探测是否有应用能处理该 scheme（例如 obsidian://）：
+        // 没有则返回 false，由 Dart 侧给出"未检测到 Obsidian"的兜底。
+        guard NSWorkspace.shared.urlForApplication(toOpen: url) != nil else {
+          result(false)
+          return
+        }
+        result(NSWorkspace.shared.open(url))
+      case "setWindowMode":
+        guard let args = call.arguments as? [String: Any],
+              let mode = args["mode"] as? String else {
+          result(FlutterError(code: "BAD_ARGS", message: "setWindowMode 需要 mode", details: nil))
+          return
+        }
+        guard let window = controller.view.window as? MainFlutterWindow else {
+          result(FlutterError(code: "NO_WINDOW", message: "窗口不是 MainFlutterWindow", details: nil))
+          return
+        }
+        switch mode {
+        case "standard":
+          window.applyStandardWindowStyle()
+        case "floating":
+          window.applyFloatingWindowStyle()
+        default:
+          result(FlutterError(code: "BAD_ARGS", message: "mode 必须是 standard|floating", details: nil))
+          return
+        }
+        result(nil)
       case "getAppVersion":
         if let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
            !version.isEmpty {
@@ -254,7 +321,7 @@ enum SettingsChannel {
     panel.canChooseDirectories = true
     panel.canChooseFiles = false
     panel.allowsMultipleSelection = false
-    panel.message = "选择你的 Obsidian Vault 文件夹"
+    panel.message = "选择采集内容的存储文件夹"
     panel.prompt = "选择此文件夹"
     let response = panel.runModal()
     guard response == .OK, let url = panel.url else { return nil }

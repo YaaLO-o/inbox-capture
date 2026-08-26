@@ -57,6 +57,7 @@ void main() {
     required FakeCaptureService capture,
     VoidCallback? onChangeVault,
     VoidCallback? onCheckUpdates,
+    VoidCallback? onOpenControlCenter,
   }) async {
     await tester.pumpWidget(
       CapturePill(
@@ -64,6 +65,7 @@ void main() {
         capture: capture,
         onChangeVault: onChangeVault ?? () {},
         onCheckUpdates: onCheckUpdates ?? () {},
+        onOpenControlCenter: onOpenControlCenter ?? () {},
       ),
     );
     final atlasFuture = tester
@@ -149,7 +151,7 @@ void main() {
     });
   });
 
-  testWidgets('右键显示 Vault 和退出菜单且不执行 Capture', (tester) async {
+  testWidgets('右键显示四项菜单且不执行 Capture', (tester) async {
     final capture = FakeCaptureService(
       const CaptureResult(CaptureStatus.saved),
     );
@@ -163,13 +165,38 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
 
-    expect(find.text('重新选择 Vault'), findsOneWidget);
+    expect(find.text('控制中心'), findsOneWidget);
+    expect(find.text('更改存储文件夹'), findsOneWidget);
     expect(find.text('检查更新'), findsOneWidget);
     expect(find.text('退出 INbox'), findsOneWidget);
     expect(capture.calls, 0);
   });
 
-  testWidgets('重新选择 Vault 菜单调用 onChangeVault', (tester) async {
+  testWidgets('控制中心菜单调用 onOpenControlCenter', (tester) async {
+    var opens = 0;
+    final capture = FakeCaptureService(
+      const CaptureResult(CaptureStatus.saved),
+    );
+    await pumpPill(
+      tester,
+      capture: capture,
+      onOpenControlCenter: () => opens += 1,
+    );
+    final center = tester.getCenter(find.bySemanticsLabel('保存到 INbox'));
+    final gesture = await tester.startGesture(
+      center,
+      buttons: kSecondaryMouseButton,
+    );
+    await gesture.up();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('控制中心'));
+    await tester.pumpAndSettle();
+
+    expect(opens, 1);
+  });
+
+  testWidgets('更改存储文件夹 菜单调用 onChangeVault', (tester) async {
     var changes = 0;
     final capture = FakeCaptureService(
       const CaptureResult(CaptureStatus.saved),
@@ -183,7 +210,7 @@ void main() {
     await gesture.up();
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('重新选择 Vault'));
+    await tester.tap(find.text('更改存储文件夹'));
     await tester.pumpAndSettle();
 
     expect(changes, 1);
@@ -239,9 +266,10 @@ void main() {
     );
     await pumpPill(tester, capture: capture);
 
-    expect(find.text('重新选择 Vault'), findsNothing);
+    expect(find.text('更改存储文件夹'), findsNothing);
     expect(find.text('检查更新'), findsNothing);
     expect(find.text('退出 INbox'), findsNothing);
+    expect(find.text('控制中心'), findsNothing);
   });
 
   testWidgets('点击菜单外部区域关闭菜单', (tester) async {
@@ -258,12 +286,12 @@ void main() {
     );
     await gesture.up();
     await tester.pumpAndSettle();
-    expect(find.text('重新选择 Vault'), findsOneWidget);
+    expect(find.text('更改存储文件夹'), findsOneWidget);
 
-    // 点击窗口底部空白区域（菜单外部）
-    await tester.tapAt(const Offset(130, 220));
+    // 点击菜单右侧空白区域（4 项菜单占 x=0..132，点 x=200 落在透明遮罩上）。
+    await tester.tapAt(const Offset(200, 220));
     await tester.pumpAndSettle();
-    expect(find.text('重新选择 Vault'), findsNothing);
+    expect(find.text('更改存储文件夹'), findsNothing);
   });
 
   testWidgets('再次右键关闭菜单', (tester) async {
@@ -281,7 +309,7 @@ void main() {
     );
     await gesture.up();
     await tester.pumpAndSettle();
-    expect(find.text('重新选择 Vault'), findsOneWidget);
+    expect(find.text('更改存储文件夹'), findsOneWidget);
 
     // 第二次右键：关闭
     gesture = await tester.startGesture(
@@ -290,6 +318,6 @@ void main() {
     );
     await gesture.up();
     await tester.pumpAndSettle();
-    expect(find.text('重新选择 Vault'), findsNothing);
+    expect(find.text('更改存储文件夹'), findsNothing);
   });
 }

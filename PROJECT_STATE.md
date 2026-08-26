@@ -1,6 +1,6 @@
 # Project State
 
-更新时间　2026-08-25
+更新时间　2026-08-26
 
 ## 当前阶段
 
@@ -12,7 +12,7 @@ Windows 原生代码已经实现，但当前开发机是 macOS，无法在本机
 
 ## 产品范围
 
-当前只做 Capture：用户复制文字、图片或本地文件后点击悬浮入口，原始内容直接追加到 Obsidian Vault。
+当前核心是 Capture：用户复制文字、图片或本地文件后点击悬浮入口，原始内容以标准 Markdown 追加到用户自选的存储文件夹。桌宠仍是主要入口；Mac 端另有"控制中心"主页面承担存储位置、展示方式、检查更新等控制职能。存储层是开放文件（Markdown + attachments），展示层可在应用内只读查看、系统默认 Markdown 应用、Obsidian 之间切换；Obsidian 是其中一种打开方式，不是数据存储本身。Apple 备忘录暂留作以后"导出到备忘录"，不作为底层存储目标。
 
 不包含 AI 分类、摘要、标签、embedding、语义搜索、Understand、Organize、云同步、账号、后端、数据库、网络内容解析、下载、Android、iOS 或 Web。
 
@@ -58,7 +58,12 @@ com.inbox.app/settings
   getVaultPath
   setVaultPath(path)
   clearVaultPath
+  getDisplayMethod / setDisplayMethod(method ∈ inbox|system|obsidian)
   pickFolder
+  revealPath(path)              # Finder/Explorer 打开存储文件夹
+  openPath(path)                # 系统默认应用打开文件
+  openExternalUrl(url)          # 打开 obsidian:// 等外部 scheme；无 handler 返回 false
+  setWindowMode(standard|floating)  # 切换原生窗口样式（红叉/标题栏 vs 悬浮）
   getAppVersion
   showWindow
   setWindowSize(width, height, animate)
@@ -69,8 +74,8 @@ com.inbox.app/settings
   installUpdate(dmgPath)
   quit
 
-com.inbox.app/commands
-  checkForUpdates
+  # 原生 → Dart 反向调用：
+  mainWindowDidClose            # 标准窗口红叉触发，Dart 复位模式状态
 ```
 
 macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows 使用 Win32 Clipboard、CF_HDROP、Registry、IFileDialog 和原生窗口 API。
@@ -87,7 +92,7 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
         └── <capture-id>.<extension>
 ```
 
-日期只由每日文件名表达，正文不再重复日期一级标题。每条 Capture 按“分钟级时间、唯一 ID 注释、可选文字、附件、分隔线”顺序写入；人类可见标题使用 `HH:mm`，机器使用的 Capture ID 和附件文件名仍保留秒数。Obsidian 支持预览的图片附件使用 embed；PDF、视频、Office、ZIP 和其他普通文件使用普通链接，Finder/Explorer 文件链接显示安全处理后的原始 basename。所有写入使用 append，不覆盖已有内容。
+日期只由每日文件名表达，正文不再重复日期一级标题。每条 Capture 按"分钟级时间、唯一 ID 注释、可选文字、附件、分隔线"顺序写入；人类可见标题使用 `HH:mm`，机器使用的 Capture ID 和附件文件名仍保留秒数。图片附件使用标准 Markdown 嵌入语法 `![](attachments/<file>)`；PDF、视频、Office、ZIP 和其他普通文件使用标准链接 `[安全显示名](attachments/<file>)`，显示名中的 `#|^:%[]()` 等字符会被清洗以保护链接结构。Obsidian 对标准 Markdown 语法完全兼容，其他 Markdown 工具（Typora、VS Code 等）也能正常渲染。所有写入使用 append，不覆盖已有内容；历史 wiki 语法文件（`![[...]]`/`[[...|name]]`）保持原样不迁移。
 
 `capture:id` 保持稳定唯一，Capture section 保持可供未来 derived data 引用；AI 分类、标签、embedding 和语义搜索仍明确推迟。
 
@@ -101,14 +106,17 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 
 - 文字、图片、本地文件 Capture
 - 唯一 Capture ID 和每日 Markdown
-- 附件普通文件存储；图片 Obsidian embed、非图片普通链接
+- 附件普通文件存储；图片标准 Markdown 嵌入语法、非图片标准链接
 - 连续 append、不覆盖
 - 500ms 快速点击防重
-- 失效 Vault 路径清理，验证过程不创建旧目录
+- 失效存储文件夹路径清理，验证过程不创建旧目录
 - 本地文件优先于同一剪贴板对象的 bitmap
 - 像素宝箱怪桌宠作为桌面入口：整个箱体可拖拽，点击触发 Capture，带 idle/capturing/success/empty/error 动画与 golden 测试
-- 右键弹出浅色快捷菜单（重新选择 Vault / 退出 INbox），不跟随系统 Dark Mode
-- 更新界面显示检查、下载进度、本机校验、安装与保留旧版的状态
+- 右键弹出浅色快捷菜单（控制中心 / 更改存储文件夹 / 检查更新 / 退出 INbox），不跟随系统 Dark Mode
+- 控制中心（Mac 主页面）：当前存储位置显示、打开/更改存储文件夹、默认展示方式选择、查看内容、检查更新、返回桌宠
+- 可切换展示层：应用内只读查看器 / 系统默认 Markdown 应用 / Obsidian；切换展示方式只改变"用什么看"，不移动或重写文件；未检测到 Obsidian 时弹窗提示可用系统默认应用打开
+- 应用内只读查看器：按日期列出最近笔记，右侧用 SelectableText 展示 Markdown 原文，无编辑功能
+- 更新界面显示检查、下载进度、本机校验、安装与保留旧版的状态；从控制中心进入更新页时窗口保持标准样式，关闭后回到控制中心
 - 当前版本来自原生 `CFBundleShortVersionString`，不在 Dart 中另设版本常量
 
 ### macOS adapter
@@ -118,8 +126,9 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 - Finder 文件存在时不再读取重复图片 bytes
 - UserDefaults、NSOpenPanel、窗口缩放/移动、置顶和跨空间
 - LSUIElement/accessory 模式隐藏 Dock 图标
-- macOS 菜单栏提供「显示 INbox」、「检查更新」和「完全退出」
-- 点红色关闭按钮后保持进程，可从菜单栏或 Applications 重新显示
+- 单窗口双样式：同一 NSWindow 在悬浮宠物与标准 macOS 窗口（标题栏 + 红叉、普通层级、居中）之间原地切换；标准窗口红叉不退出进程，切回悬浮宠物并通过 `mainWindowDidClose` 通知 Dart 复位状态
+- 右键宠物弹出四项快捷菜单（控制中心 / 更改存储文件夹 / 检查更新 / 退出 INbox）
+- `revealPath`/`openPath`/`openExternalUrl` 调起 Finder、系统默认应用与外部 URL scheme（含 Obsidian 存在性探测）
 - 更新包校验通过后由本地 helper 替换 `/Applications/INbox.app`，失败时保留或回滚到旧版
 - 只有用户点「检查更新」或主动运行安装脚本时才联系 GitHub
 

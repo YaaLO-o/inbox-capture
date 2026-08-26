@@ -3,13 +3,15 @@ import 'dart:io';
 import '../models/capture.dart';
 import '../util/path_utils.dart';
 
-/// Obsidian Vault 写入层。
+/// 存储文件夹写入层。
 ///
-/// 唯一存储层：所有内容都是普通 Markdown 与普通文件（见《方案》第二节）。
+/// 唯一存储层：所有内容都是标准 Markdown 与普通文件（见《方案》第二节）。
 /// - 每日一个 `Universal Capture/YYYY-MM-DD.md`，只追加，绝不覆盖。
 /// - 附件写入 `Universal Capture/attachments/`。
+/// - 附件引用使用标准 Markdown 语法（`![](...)`、`[name](...)`），
+///   Obsidian 与任意标准 Markdown 工具均可正常渲染。
 class StorageService {
-  /// 确保 Vault 的 Universal Capture 与 attachments 目录存在。
+  /// 确保存储文件夹的 Universal Capture 与 attachments 目录存在。
   void ensureVaultLayout(String vaultPath) {
     final capture = Directory(VaultPaths.captureDir(vaultPath));
     if (!capture.existsSync()) {
@@ -49,11 +51,9 @@ class StorageService {
       final ref = VaultPaths.embedRef(a.fileName);
       final displayName = _safeDisplayName(a.displayName);
       if (a.isImage) {
-        buf.writeln('![[$ref]]');
-      } else if (displayName != null) {
-        buf.writeln('[[$ref|$displayName]]');
+        buf.writeln('![]($ref)');
       } else {
-        buf.writeln('[[$ref]]');
+        buf.writeln('[${displayName ?? ref}]($ref)');
       }
       buf.writeln();
     }
@@ -68,7 +68,7 @@ class StorageService {
     if (displayName == null) return null;
     final oneLine = displayName.replaceAll(RegExp(r'[\x00-\x1f\x7f]'), ' ');
     final safe = oneLine
-        .replaceAll(RegExp(r'[#|^:%\[\]]'), '')
+        .replaceAll(RegExp(r'[#|^:%\[\]()]'), '')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
     return safe.isEmpty ? null : safe;

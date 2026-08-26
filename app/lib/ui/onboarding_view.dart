@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/settings_service.dart';
 import 'window_sizes.dart';
 
-/// 首次启动：让用户选择 Obsidian Vault（见《方案》第十二节）。
+/// 首次启动：让用户选择采集内容的存储文件夹（见《方案》第十二节）。
 class OnboardingView extends StatefulWidget {
   final SettingsService settings;
   final void Function(String vaultPath) onVaultSelected;
@@ -92,12 +92,12 @@ class _OnboardingViewState extends State<OnboardingView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        '选择 Obsidian Vault',
+                        '选择存储文件夹',
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 8),
                       const Text(
-                        '采集内容将写入该 Vault 下的 Universal Capture 目录，附件保存在其中的 attachments 子目录。',
+                        '采集内容将写入该文件夹下的 Universal Capture 目录，附件保存在其中的 attachments 子目录。',
                         style: TextStyle(
                           fontSize: 12.5,
                           color: Color(0xFFB7B7C2),

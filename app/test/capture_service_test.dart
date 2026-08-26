@@ -155,7 +155,7 @@ void main() {
 
     final md = readInbox(tmp.path, now);
     final fileName = files.single.uri.pathSegments.last;
-    expect(md, contains('![[attachments/$fileName]]'));
+    expect(md, contains('![](attachments/$fileName)'));
   });
 
   test('Finder 文件按类型落盘，并以普通链接保留安全显示名', () async {
@@ -216,6 +216,12 @@ void main() {
             displayName: '相机原图.heic',
             isImage: false,
           ),
+          (
+            name: '方案(最终).pdf',
+            extension: 'pdf',
+            displayName: '方案(最终).pdf',
+            isImage: false,
+          ),
         ];
     final svc = CaptureService(
       clipboard: FakeClipboard(const ClipboardContent()),
@@ -240,12 +246,16 @@ void main() {
       expect(copied.readAsBytesSync(), [i, i + 1]);
 
       final md = readInbox(tmp.path, now);
+      // 显示名经 _safeDisplayName 清洗：去掉 #|^:%[]() 等会破坏 Markdown
+      // 链接结构的字符。这里同步清洗以匹配实际写入内容。
+      final expectedLabel = source.displayName
+          .replaceAll(RegExp(r'[#|^:%\[\]()]'), '');
       final entry = source.isImage
-          ? '![[attachments/$fileName]]'
-          : '[[attachments/$fileName|${source.displayName}]]';
+          ? '![](attachments/$fileName)'
+          : '[$expectedLabel](attachments/$fileName)';
       expect(md, contains(entry));
       if (!source.isImage) {
-        expect(md, isNot(contains('![[attachments/$fileName]]')));
+        expect(md, isNot(contains('![](attachments/$fileName)')));
       }
       expect(
         md.indexOf('## ${VaultPaths.timeStamp(now)}'),
@@ -261,7 +271,7 @@ void main() {
     }
   });
 
-  test('危险扩展名和换行显示名不会破坏 Wikilink 或 Capture 边界', () async {
+  test('危险扩展名和换行显示名不会破坏 Markdown 链接或 Capture 边界', () async {
     final now = DateTime(2026, 8, 21, 18, 5, 30);
     final src = File('${tmp.path}/报告\n---\n终版.bad#draft')
       ..writeAsBytesSync([1, 2, 3]);
@@ -279,7 +289,7 @@ void main() {
       isTrue,
     );
     final md = readInbox(tmp.path, now);
-    expect(md, contains('[[attachments/$storedName|报告 --- 终版.baddraft]]'));
+    expect(md, contains('[报告 --- 终版.baddraft](attachments/$storedName)'));
     expect(md, isNot(contains('attachments/$storedName.bad#draft')));
     expect('---\n'.allMatches(md), hasLength(1));
   });
@@ -366,7 +376,7 @@ void main() {
     final md = readInbox(tmp.path, now);
     expect(md, contains('这本书以后看看'));
     expect(
-      md.contains(RegExp(r'!\[\[attachments/[0-9\-a-f]+\.jpg\]\]')),
+      md.contains(RegExp(r'!\[\]\(attachments/[0-9\-a-f]+\.jpg\)')),
       isTrue,
     );
   });
