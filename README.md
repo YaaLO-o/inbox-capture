@@ -46,10 +46,11 @@
 
 INbox 的设计原则是"你的东西只属于你"：
 
-- Obsidian Vault 是**唯一存储层**，数据就是你电脑上的文件
+- 数据就是你电脑上的**标准 Markdown + attachments**，存储文件夹由你自己选择
+- 展示层可切换：应用内只读查看、系统默认 Markdown 应用或 Obsidian；Obsidian 只是其中一种打开方式
 - 不使用数据库，不建账号
 - 不跟踪、不上报、不分析
-- 只有你在菜单栏点「检查更新」，或主动运行安装命令时，INbox 才会联系 GitHub
+- 只有你在控制中心点「检查更新」，或主动运行安装命令时，INbox 才会联系 GitHub
 - 源代码完全开放，可以自行审计
 
 ## 安装
@@ -64,7 +65,7 @@ curl -fsSL https://raw.githubusercontent.com/YaaLO-o/inbox-capture/main/scripts/
 
 用这种方式安装不会出现「无法验证开发者」的提示。原理和 Homebrew 的 `brew install --no-quarantine` 相同。
 
-正在使用 1.1.0 或更早版本时，请运行一次这条命令升级到 1.1.1。之后也可以直接在菜单栏点「检查更新」自动升级。
+正在使用旧版本时，运行一次这条命令即可升级到最新版。之后可以直接在 INbox 里右键桌宠 →「控制中心」→「检查更新」自动升级。
 
 ### 方式二：手动下载 DMG
 
@@ -76,22 +77,22 @@ curl -fsSL https://raw.githubusercontent.com/YaaLO-o/inbox-capture/main/scripts/
 
 支持 Apple Silicon（M 系列）和 Intel 芯片。
 
-### 1.1.1 及后续版本的更新
+### 应用内更新
 
-正常更新时，点 macOS 菜单栏里的 INbox 图标，再点「检查更新」。INbox 会在本机校验下载文件，校验成功后替换 `/Applications/INbox.app` 并重新打开。网络断开、校验失败或安装失败时，当前版本会保留。
+正常更新时，右键桌宠 →「控制中心」→「检查更新」。INbox 会在本机校验下载文件，校验成功后替换 `/Applications/INbox.app` 并重新打开。网络断开、校验失败或安装失败时，当前版本会保留。
 
 上面的终端命令仍然保留。当菜单更新无法打开，或一次更新被中断时，可以用它恢复到最新版。
 
 ### 窗口与退出
 
-INbox 窗口保留 macOS 的红黄绿按钮。点红色关闭按钮只会隐藏窗口，应用会继续运行。需要重新打开时，点菜单栏里的 INbox 图标，再点「显示 INbox」。需要结束进程时，请点「完全退出」。
+INbox 平时以悬浮桌宠形式运行（无 Dock 图标）。右键桌宠可以打开控制中心、更改存储文件夹、检查更新或退出。在控制中心/阅读器等标准窗口里点红色关闭按钮，会回到悬浮桌宠而不退出进程。需要重新唤回窗口时，从 Applications 或 Spotlight 再次打开 INbox 即可。需要结束进程时，右键桌宠 →「退出 INbox」。
 
 ## 数据存在哪
 
-INbox 把内容写进你选择的 Obsidian Vault：
+INbox 把内容写进你选择的存储文件夹（标准 Markdown + attachments，可以是任何普通文件夹，也可以是 Obsidian vault）：
 
 ```text
-<Vault>/
+<存储文件夹>/
 └── Universal Capture/
     ├── 2026-08-23.md          # 每天一个文件
     └── attachments/
@@ -108,7 +109,7 @@ INbox 把内容写进你选择的 Obsidian Vault：
 
 复制的文字
 
-![[attachments/20260823-103215-a82f.png]]
+![](attachments/20260823-103215-a82f.png)
 
 ---
 ```
@@ -139,7 +140,8 @@ sh scripts/release_macos.sh 1.1.1
 ## 路线图
 
 - ✅ macOS 文字 / 图片 / 文件采集，像素桌宠入口
-- ✅ 菜单栏图标（显示 / 检查更新 / 完全退出）
+- ✅ Mac 控制中心主页面（存储位置、打开/更改存储文件夹、默认展示方式、检查更新）
+- ✅ 开放文件存储 + 可切换展示层（应用内只读查看 / 系统默认 Markdown 应用 / Obsidian）
 - ✅ App 内更新（下载进度、SHA-256 校验、原子替换、失败回滚）
 - 🚧 Windows 适配（代码已完成，待真机首次编译验证）
 - ⏳ AI 分类、标签、摘要、语义搜索（基于 `capture:id`）
