@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-V0.1（Mac Capture MVP）已完成，macOS 生命周期与应用内更新已完成 1.1.1 本地发布准备和预发布验证。`app/` 是唯一正式主工程，包含 macOS 和 Windows target；旧 Electron Windows 客户端已降级到 `legacy/electron-windows/`，只作为迁移参考。桌面入口已从悬浮胶囊改为像素宝箱怪桌宠。
+V0.1（Mac Capture MVP）和 Android Capture MVP 已完成。macOS 生命周期与应用内更新已完成 1.1.1 本地发布准备和预发布验证。`app/` 是唯一正式主工程，包含 Android、macOS 和 Windows target；旧 Electron Windows 客户端已降级到 `legacy/electron-windows/`，只作为迁移参考。桌面入口已从悬浮胶囊改为像素宝箱怪桌宠。
 
 macOS Release App 已完成本机安装验证。正式应用名为 `INbox`，Bundle Identifier 保持 `com.inbox.inboxApp`，安装位置为 `/Applications/INbox.app`；可从 Applications 或 Spotlight 启动，运行后继续保持 LSUIElement 桌面悬浮助手模式。再次从 Applications 或 Spotlight 打开已运行的 INbox 时，AppDelegate 会重新显示悬浮窗。安装脚本会注销并归档 build 目录中的同名 `.app` 产物，避免开发产物污染 Spotlight 搜索结果。
 
@@ -14,7 +14,7 @@ Windows 原生代码已经实现，但当前开发机是 macOS，无法在本机
 
 当前核心是 Capture：用户复制文字、图片或本地文件后点击悬浮入口，原始内容以标准 Markdown 追加到用户自选的存储文件夹。桌宠仍是主要入口；Mac 端另有"控制中心"主页面承担存储位置、展示方式、检查更新等控制职能。存储层是开放文件（Markdown + attachments），展示层可在应用内只读查看、系统默认 Markdown 应用、Obsidian 之间切换；Obsidian 是其中一种打开方式，不是数据存储本身。Apple 备忘录暂留作以后"导出到备忘录"，不作为底层存储目标。
 
-不包含 AI 分类、摘要、标签、embedding、语义搜索、Understand、Organize、云同步、账号、后端、数据库、网络内容解析、下载、Android、iOS 或 Web。
+不包含 AI 分类、摘要、标签、embedding、语义搜索、Understand、Organize、云同步、账号、后端、数据库、网络内容解析、下载、iOS 或 Web。Android 当前范围仅为个人侧载的 Capture MVP。
 
 ## 最终架构
 
@@ -22,6 +22,7 @@ Windows 原生代码已经实现，但当前开发机是 macOS，无法在本机
 Shared Flutter app
 ├── Dart model / CaptureService / StorageService / VaultPaths
 ├── shared onboarding and floating capture UI
+├── Android Kotlin SAF / Share Target / floating overlay adapter
 ├── macOS Swift + AppKit MethodChannel adapter
 └── Windows C++ + Win32 MethodChannel adapter
 ```
@@ -144,9 +145,19 @@ macOS 使用 NSPasteboard、UserDefaults、NSOpenPanel 和 NSWindow。Windows �
 - 无边框、置顶、Tool Window 窗口
 - 窗口缩放、拖动和退出
 
+### Android adapter
+
+- Android 10（API 29）及以上，当前为个人侧载 APK
+- 通过 Storage Access Framework 持久授权真实 Obsidian Vault，不申请全盘存储权限
+- 系统 Share Target 支持文字、URL、单图、多图、PDF、视频和普通文件
+- 附件以流方式写入并校验真实字节；图片生成 Obsidian embed，其他附件生成普通链接
+- 用户主动开启的悬浮球在点击时读取一次当前剪贴板，不做后台轮询
+- 悬浮球需要 overlay 权限，Android 13 及以上需要通知权限；不注册开机启动
+- 跨日首次 Capture 会按设备当天日期自动创建缺失的 `YYYY-MM-DD.md`
+
 ## 自动化测试
 
-当前 Flutter 测试共 85 项，覆盖：
+当前 Flutter 测试共 126 项，覆盖桌面与 Android 共享 Capture 行为，包括：
 
 - 统一目录和 attachment 引用
 - macOS/Windows 标记输入生成相同 Markdown
@@ -220,7 +231,8 @@ flutter build windows
 
 - 必须在 Windows runner 或 Windows 真机首次编译 C++ Runner。
 - 必须真机测试 Windows 文字、PNG/JPEG、bitmap、Explorer 文件、目录选择、重启恢复、拖动、右键菜单与退出。
-- 需要在真实 Obsidian 中验证图片 embed 与普通文件链接显示。
+- Android overlay 权限在应用处于后台时被撤销，前台服务和通知可能暂时残留到下次应用恢复；Capture 数据正确性不受影响，列为 P2。
+- Pixel 6 API 36 模拟器未复现悬浮球进入状态栏或手势区的问题；真实 WindowInsets 的额外 OEM 覆盖列为 P2。
 - macOS App Sandbox 仍关闭；重新启用需要 security-scoped bookmark。
 - Developer ID、公证、开机启动和公开发布仍是后续工作。本地可以生成 Universal DMG，但未经明确授权不会推送、打 tag 或修改 GitHub Release。
 
@@ -251,3 +263,7 @@ cd app
 flutter pub get
 flutter run -d windows
 ```
+
+## Android MVP 验证
+
+2026-08-26 已在 Pixel 6 API 36 模拟器与 Xiaomi 13 Pro（Android 16 / HyperOS OS3.0.310.0.WMBCNXM）完成验收。静态分析、Flutter 126/126、Android JVM tests、API 36 instrumentation、Android debug APK 和 macOS debug build 均通过；Xiaomi 的 Share 附件与来源 SHA-256 一致，Obsidian 1.13.8 可渲染图片并识别普通附件链接。详见 [`docs/android-mvp-verification.md`](docs/android-mvp-verification.md)。

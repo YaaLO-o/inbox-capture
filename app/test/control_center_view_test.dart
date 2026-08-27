@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inbox_app/services/display_service.dart';
 import 'package:inbox_app/services/settings_service.dart';
-import 'package:inbox_app/services/storage_service.dart';
 import 'package:inbox_app/ui/control_center_view.dart';
 
 void main() {
@@ -49,7 +48,6 @@ void main() {
       home: ControlCenterView(
         vaultPath: tmp.path,
         settings: SettingsService(),
-        storage: StorageService(),
         display: DisplayService(settings: SettingsService()),
         onVaultPathChanged: onVaultPathChanged ?? (_) {},
         onCheckUpdates: onCheckUpdates ?? () {},

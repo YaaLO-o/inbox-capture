@@ -3,9 +3,10 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../models/app_release.dart';
+import '../services/desktop_file_vault_storage.dart';
 import '../services/display_service.dart';
 import '../services/settings_service.dart';
-import '../services/storage_service.dart';
+import '../services/vault_storage.dart';
 import '../util/path_utils.dart';
 
 /// 控制中心：Mac 主页面，承担"控制中心"角色。
@@ -15,7 +16,7 @@ import '../util/path_utils.dart';
 class ControlCenterView extends StatefulWidget {
   final String vaultPath;
   final SettingsService settings;
-  final StorageService storage;
+  final VaultStorage storage;
   final DisplayService display;
   final void Function(String newPath) onVaultPathChanged;
   final VoidCallback onCheckUpdates;
@@ -25,8 +26,8 @@ class ControlCenterView extends StatefulWidget {
   const ControlCenterView({
     super.key,
     required this.vaultPath,
+    this.storage = const DesktopFileVaultStorage(),
     required this.settings,
-    required this.storage,
     required this.display,
     required this.onVaultPathChanged,
     required this.onCheckUpdates,
@@ -142,7 +143,7 @@ class _ControlCenterViewState extends State<ControlCenterView> {
       }
       // 选择新的真实数据目录：在新位置建好布局，绝不搬旧文件，
       // 也不写任何 Obsidian 配置。
-      widget.storage.ensureVaultLayout(path);
+      await widget.storage.ensureLayout(path);
       await widget.settings.setVaultPath(path);
       if (!mounted) return;
       widget.onVaultPathChanged(path);

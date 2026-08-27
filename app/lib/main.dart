@@ -1,12 +1,18 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'models/app_release.dart';
+import 'services/android_capture_dispatcher.dart';
+import 'services/android_saf_vault_storage.dart';
+import 'services/android_vault_settings.dart';
 import 'services/capture_service.dart';
 import 'services/clipboard_service.dart';
+import 'services/desktop_file_vault_storage.dart';
 import 'services/display_service.dart';
 import 'services/settings_service.dart';
-import 'services/storage_service.dart';
 import 'services/update_service.dart';
+import 'services/vault_storage.dart';
+import 'ui/android_settings_view.dart';
 import 'ui/capture_pill.dart';
 import 'ui/control_center_view.dart';
 import 'ui/note_reader_view.dart';
@@ -14,19 +20,38 @@ import 'ui/onboarding_view.dart';
 import 'ui/update_view.dart';
 import 'ui/window_sizes.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    const settings = AndroidVaultSettings();
+    const VaultStorage storage = AndroidSafVaultStorage();
+    final capture = CaptureService(
+      clipboard: ClipboardService(),
+      storage: storage,
+    );
+    await AndroidCaptureDispatcher(
+      vaultId: () async {
+        final vault = await settings.getVault();
+        return vault?.accessible == true ? vault!.id : null;
+      },
+      capture: capture.captureInput,
+    ).start();
+    runApp(const AndroidSettingsView(settings: settings));
+    return;
+  }
   runApp(const InboxApp());
 }
 
 class InboxApp extends StatefulWidget {
   final SettingsService? settings;
   final UpdateService? updateService;
+  final VaultStorage? storage;
 
   const InboxApp({
     super.key,
     this.settings,
     this.updateService,
+    this.storage,
   });
 
   @override
@@ -40,7 +65,7 @@ class _InboxAppState extends State<InboxApp> {
   late final SettingsService _settings;
   late final CaptureService _capture;
   late final UpdateService _updates;
-  late final StorageService _storage;
+  late final VaultStorage _storage;
   late final DisplayService _display;
 
   String? _vaultPath;
@@ -56,7 +81,7 @@ class _InboxAppState extends State<InboxApp> {
     super.initState();
     _settings = widget.settings ?? SettingsService();
     _updates = widget.updateService ?? UpdateService();
-    _storage = StorageService();
+    _storage = widget.storage ?? const DesktopFileVaultStorage();
     _display = DisplayService(settings: _settings);
     _capture = CaptureService(
       clipboard: ClipboardService(),
@@ -85,7 +110,7 @@ class _InboxAppState extends State<InboxApp> {
       _vaultPath = path;
       _loading = false;
     });
-    // 已有 Vault：缩回胶囊尺寸。
+    // 已有存储文件夹：缩回胶囊尺寸。
     if (path != null) {
       _settings.setWindowSize(WindowSizes.pillWidth, WindowSizes.pillHeight);
     }
@@ -270,7 +295,7 @@ class _InboxAppState extends State<InboxApp> {
       vaultPath: path,
       capture: _capture,
       onChangeVault: _changeVault,
-      onCheckUpdates: _showUpdates,
+      onCheckUpdates: () => _showUpdates(),
       onOpenControlCenter: _openControlCenter,
     );
   }

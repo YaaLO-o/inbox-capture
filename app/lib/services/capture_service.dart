@@ -1,12 +1,14 @@
-import 'dart:io';
+import 'dart:async';
 
 import '../models/capture.dart';
+import '../models/capture_input.dart';
 import '../util/id_gen.dart';
 import 'clipboard_service.dart';
-import 'storage_service.dart';
+import 'markdown_formatter.dart';
+import 'vault_storage.dart';
 
 /// 一次 Capture 的结果，用于 UI 反馈。
-enum CaptureStatus { saved, empty, error }
+enum CaptureStatus { saved, empty, vaultUnavailable, permissionDenied, error }
 
 class CaptureResult {
   final CaptureStatus status;
@@ -18,116 +20,132 @@ class CaptureResult {
   bool get isSaved => status == CaptureStatus.saved;
 }
 
-/// Capture 编排：读剪贴板 → 构建 Capture → 落盘附件 → 追加 Inbox。
-///
-/// 不做任何分类/摘要（见《方案》第十、十六节）。
+/// Capture 编排：适配平台输入，串行落盘附件，并原子追加 Inbox。
 class CaptureService {
   final ClipboardReader clipboard;
-  final StorageService storage;
-
-  /// 防止重复快速点击（见《方案》第十七节 测试 5）。
+  final VaultStorage storage;
+  final String Function(DateTime) idGenerator;
+  Future<void> _queue = Future.value();
   DateTime? _lastCaptureAt;
 
-  CaptureService({required this.clipboard, required this.storage});
+  CaptureService({
+    required this.clipboard,
+    required this.storage,
+    this.idGenerator = generateCaptureId,
+  });
 
-  Future<CaptureResult> captureNow(String vaultPath, {DateTime? now}) async {
-    final ts = now ?? DateTime.now();
-
-    // 500ms 内的重复点击直接忽略，避免重复写入。
+  Future<CaptureResult> captureNow(String vaultId, {DateTime? now}) async {
+    final timestamp = now ?? DateTime.now();
     final last = _lastCaptureAt;
-    if (last != null && ts.difference(last).inMilliseconds.abs() < 500) {
+    if (last != null && timestamp.difference(last).inMilliseconds.abs() < 500) {
       return const CaptureResult(CaptureStatus.error, message: '操作过于频繁');
     }
-    _lastCaptureAt = ts;
-
+    _lastCaptureAt = timestamp;
+    final CaptureInput input;
     try {
-      storage.ensureVaultLayout(vaultPath);
+      input = (await clipboard.read()).toCaptureInput();
+    } catch (_) {
+      return const CaptureResult(CaptureStatus.error);
+    }
+    return captureInput(vaultId, input, now: timestamp);
+  }
 
-      final content = await clipboard.read();
-      if (!content.hasContent) {
-        return const CaptureResult(CaptureStatus.empty, message: '剪贴板为空');
+  Future<CaptureResult> captureInput(
+    String vaultId,
+    CaptureInput input, {
+    DateTime? now,
+  }) {
+    final completer = Completer<CaptureResult>();
+    _queue = _queue.then((_) async {
+      try {
+        completer.complete(await _captureInput(vaultId, input, now: now));
+      } catch (error, stack) {
+        completer.completeError(error, stack);
       }
+    });
+    return completer.future;
+  }
 
-      final id = generateCaptureId(ts);
+  Future<CaptureResult> _captureInput(
+    String vaultId,
+    CaptureInput input, {
+    DateTime? now,
+  }) async {
+    if (!input.hasContent) {
+      return const CaptureResult(CaptureStatus.empty, message: '剪贴板为空');
+    }
+
+    final timestamp = now ?? DateTime.now();
+    final id = idGenerator(timestamp);
+    final completedFileNames = <String>[];
+    try {
+      await storage.ensureLayout(vaultId);
       final attachments = <Attachment>[];
-
-      // 1) 图片：写入 attachments，保留原始扩展名；只有原始 bitmap 时落为 PNG。
-      if (content.files.isEmpty && content.imageBytes != null) {
-        final rawExtension = content.imageExtension.isEmpty
-            ? 'png'
-            : content.imageExtension;
-        final sanitizedExtension = _safeExtension(rawExtension);
-        final ext = sanitizedExtension.isEmpty ? 'png' : sanitizedExtension;
-        final fileName = '$id.$ext';
-        storage.writeAttachmentBytes(vaultPath, fileName, content.imageBytes!);
+      for (var index = 0; index < input.attachments.length; index++) {
+        final inputAttachment = input.attachments[index];
+        final suffix =
+            input.usesDesktopFileNames && input.attachments.length > 1
+            ? '-$index'
+            : index == 0
+            ? ''
+            : '-$index';
+        final extension = _safeExtension(inputAttachment.extension);
+        final fileName = '$id$suffix${extension.isEmpty ? '' : '.$extension'}';
+        await storage.importAttachment(
+          vaultId,
+          inputAttachment.source,
+          fileName,
+        );
+        completedFileNames.add(fileName);
         attachments.add(
           Attachment(
-            id: id,
+            id: '$id$suffix',
             fileName: fileName,
-            originalExtension: ext,
-            mimeType: content.imageMimeType,
+            originalExtension: extension,
+            mimeType: inputAttachment.mimeType,
+            displayName: inputAttachment.displayName,
           ),
         );
       }
-
-      // 2) Finder / Explorer 复制的本地文件：复制进 attachments。
-      for (var i = 0; i < content.files.length; i++) {
-        final src = content.files[i];
-        final ext = _safeExtension(_extensionOf(src));
-        // 多个文件时用同一 id + 序号，保证唯一。
-        final suffix = content.files.length > 1 ? '-$i' : '';
-        final baseName = '$id$suffix${ext.isEmpty ? '' : '.$ext'}';
-        try {
-          storage.copyAttachmentFile(vaultPath, src, baseName);
-          attachments.add(
-            Attachment(
-              id: '$id$suffix',
-              fileName: baseName,
-              originalExtension: ext,
-              displayName: _baseNameOf(src),
-            ),
-          );
-        } on FileSystemException catch (e) {
-          // 单个文件复制失败不应让整个 Capture 崩溃；记录文字占位。
-          // 这里不引入日志依赖，失败静默跳过该附件。
-          // ignore: avoid_print
-          print('skip attachment $src: ${e.message}');
-        }
-      }
-
-      final text = (content.text?.trim().isNotEmpty ?? false)
-          ? content.text!.trim()
-          : null;
-
       final capture = Capture(
         id: id,
-        createdAt: ts,
-        text: text,
+        createdAt: timestamp,
+        text: input.text?.trim().isNotEmpty == true ? input.text!.trim() : null,
         attachments: attachments,
       );
-
-      if (capture.isEmpty) {
-        return const CaptureResult(CaptureStatus.empty, message: '剪贴板为空');
-      }
-
-      storage.appendCapture(vaultPath, capture);
+      await storage.appendMarkdown(
+        vaultId,
+        DateTime(timestamp.year, timestamp.month, timestamp.day),
+        const MarkdownFormatter().format(capture),
+      );
       return CaptureResult(CaptureStatus.saved, captureId: id);
-    } catch (e) {
-      return CaptureResult(CaptureStatus.error, message: e.toString());
+    } on VaultStorageException catch (error) {
+      await _rollback(vaultId, completedFileNames);
+      return CaptureResult(_statusFor(error), message: error.message);
+    } catch (_) {
+      await _rollback(vaultId, completedFileNames);
+      return const CaptureResult(CaptureStatus.error);
     }
   }
 
-  String _extensionOf(String path) {
-    final fileName = _baseNameOf(path);
-    final dot = fileName.lastIndexOf('.');
-    if (dot <= 0 || dot == fileName.length - 1) return '';
-    return fileName.substring(dot + 1).toLowerCase();
+  Future<void> _rollback(String vaultId, List<String> fileNames) async {
+    for (final fileName in fileNames.reversed) {
+      try {
+        await storage.deleteAttachment(vaultId, fileName);
+      } catch (_) {
+        // The original transaction failure remains the result.
+      }
+    }
   }
+
+  CaptureStatus _statusFor(VaultStorageException error) => switch (error.code) {
+    VaultStorageException.vaultUnavailable => CaptureStatus.vaultUnavailable,
+    VaultStorageException.permissionDenied => CaptureStatus.permissionDenied,
+    _ => CaptureStatus.error,
+  };
 
   String _safeExtension(String extension) {
     final normalized = extension.toLowerCase();
     return RegExp(r'^[a-z0-9]+$').hasMatch(normalized) ? normalized : '';
   }
-
-  String _baseNameOf(String path) => path.replaceAll('\\', '/').split('/').last;
 }

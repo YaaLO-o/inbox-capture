@@ -4,10 +4,11 @@
 
 **把任何平台看到的东西，一键收进你的 Obsidian。**
 
-一个本地优先、不上传、不后台监听的桌面采集 Inbox。用一个像素宝箱怪作为桌面入口，复制完点一下，文字、图片、文件就写进你自己的库。
+一个本地优先、不上传、不后台监听的采集 Inbox。桌面端用像素宝箱怪作为入口；Android 可从系统分享菜单发送文字、图片和文件，也可点悬浮球读取当前剪贴板。内容直接写进你自己的库。
 
 <div>
     <a href="#安装"><img alt="macOS" src="https://img.shields.io/badge/-macOS%20Universal-black?style=flat-square&logo=apple&logoColor=white" /></a>
+    <a href="#android-个人侧载"><img alt="Android" src="https://img.shields.io/badge/-Android%2010%2B-3DDC84?style=flat-square&logo=android&logoColor=white" /></a>
     <a href="https://github.com/YaaLO-o/inbox-capture/releases"><img alt="Windows" src="https://img.shields.io/badge/-Windows%20%E8%A7%84%E5%88%92%E4%B8%AD-blue?style=flat-square&logo=windows&logoColor=white" /></a>
 </div>
 
@@ -87,6 +88,16 @@ curl -fsSL https://raw.githubusercontent.com/YaaLO-o/inbox-capture/main/scripts/
 
 INbox 平时以悬浮桌宠形式运行（无 Dock 图标）。右键桌宠可以打开控制中心、更改存储文件夹、检查更新或退出。在控制中心/阅读器等标准窗口里点红色关闭按钮，会回到悬浮桌宠而不退出进程。需要重新唤回窗口时，从 Applications 或 Spotlight 再次打开 INbox 即可。需要结束进程时，右键桌宠 →「退出 INbox」。
 
+### Android（个人侧载版，Android 10+）
+
+<a href="https://github.com/YaaLO-o/inbox-capture/releases/download/v1.1.1-android-mvp/INbox-android-1.1.1-mvp-debug-signed.apk"><b>⬇ 下载 INbox for Android（APK，Android 10+）</b></a>
+
+适用于 **Android 10（API 29）及以上**，当前为**个人侧载版**（不在应用商店发布）。下载后在手机上打开 APK 即可安装（可能需要在系统设置中允许“安装未知来源应用”）。安装后在应用内用系统目录选择器授权一个文件夹（可以是 Obsidian Vault）；INbox 只通过这份 SAF 授权写入 `Universal Capture/`，不要求整个存储空间权限。
+
+系统分享菜单支持文字、URL、单图、多图、PDF、视频和普通文件。悬浮球需要“显示在其他应用上层”权限；Android 13 及以上还需要通知权限来显示前台服务通知。悬浮球只在用户主动开启后运行，不监听后台剪贴板，也不随开机自动启动。
+
+当前 Android MVP 已在 Xiaomi 13 Pro（Android 16 / HyperOS OS3.0.310.0.WMBCNXM）和 Pixel 6 API 36 模拟器验收。完整范围、测试结果和已知 P2 见 [Android MVP 验证记录](docs/android-mvp-verification.md)。
+
 ## 数据存在哪
 
 INbox 把内容写进你选择的存储文件夹（标准 Markdown + attachments，可以是任何普通文件夹，也可以是 Obsidian vault）：
@@ -143,6 +154,7 @@ sh scripts/release_macos.sh 1.1.1
 - ✅ Mac 控制中心主页面（存储位置、打开/更改存储文件夹、默认展示方式、检查更新）
 - ✅ 开放文件存储 + 可切换展示层（应用内只读查看 / 系统默认 Markdown 应用 / Obsidian）
 - ✅ App 内更新（下载进度、SHA-256 校验、原子替换、失败回滚）
+- ✅ Android 文字 / 图片 / 文件系统分享与剪贴板悬浮球 MVP（Android 10+ 个人侧载版）
 - 🚧 Windows 适配（代码已完成，待真机首次编译验证）
 - ⏳ AI 分类、标签、摘要、语义搜索（基于 `capture:id`）
 - ⏳ Apple Developer ID 签名与公证，免去首次打开提示

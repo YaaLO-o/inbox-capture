@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inbox_app/services/capture_service.dart';
 import 'package:inbox_app/services/clipboard_service.dart';
-import 'package:inbox_app/services/storage_service.dart';
+import 'package:inbox_app/services/desktop_file_vault_storage.dart';
 import 'package:inbox_app/ui/capture_pill.dart';
 
 class FakeEmptyClipboard implements ClipboardReader {
@@ -20,7 +20,10 @@ class FakeCaptureService extends CaptureService {
   CaptureResult result;
 
   FakeCaptureService(this.result)
-    : super(clipboard: FakeEmptyClipboard(), storage: StorageService());
+    : super(
+        clipboard: FakeEmptyClipboard(),
+        storage: const DesktopFileVaultStorage(),
+      );
 
   @override
   Future<CaptureResult> captureNow(String vaultPath, {DateTime? now}) async {

@@ -1,11 +1,15 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inbox_app/models/capture.dart';
+import 'package:inbox_app/models/capture_input.dart';
 import 'package:inbox_app/services/capture_service.dart';
 import 'package:inbox_app/services/clipboard_service.dart';
-import 'package:inbox_app/services/storage_service.dart';
+import 'package:inbox_app/services/desktop_file_vault_storage.dart';
+import 'package:inbox_app/services/markdown_formatter.dart';
+import 'package:inbox_app/services/vault_storage.dart';
 import 'package:inbox_app/util/id_gen.dart';
 import 'package:inbox_app/util/path_utils.dart';
 
@@ -17,13 +21,97 @@ class FakeClipboard implements ClipboardReader {
   Future<ClipboardContent> read() async => content;
 }
 
+class ThrowingClipboard implements ClipboardReader {
+  @override
+  Future<ClipboardContent> read() =>
+      Future.error(StateError('raw channel error'));
+}
+
+class RecordingVaultStorage implements VaultStorage {
+  String? appendedMarkdown;
+
+  @override
+  Future<void> appendMarkdown(
+    String vaultId,
+    DateTime date,
+    String markdown,
+  ) async {
+    appendedMarkdown = markdown;
+  }
+
+  @override
+  Future<void> deleteAttachment(String vaultId, String fileName) async {}
+
+  @override
+  Future<void> ensureLayout(String vaultId) async {}
+
+  @override
+  Future<void> importAttachment(
+    String vaultId,
+    AttachmentSource source,
+    String fileName,
+  ) async {}
+}
+
+class TransactionRecordingStorage implements VaultStorage {
+  final events = <String>[];
+  final Completer<void>? firstImportCompleter;
+  final int? failImportAt;
+  final VaultStorageException? appendError;
+  int _imports = 0;
+
+  TransactionRecordingStorage({
+    this.firstImportCompleter,
+    this.failImportAt,
+    this.appendError,
+  });
+
+  @override
+  Future<void> ensureLayout(String vaultId) async =>
+      events.add('ensure:$vaultId');
+
+  @override
+  Future<void> importAttachment(
+    String vaultId,
+    AttachmentSource source,
+    String fileName,
+  ) async {
+    events.add('import:$fileName');
+    _imports++;
+    if (_imports == 1 && firstImportCompleter != null) {
+      await firstImportCompleter!.future;
+    }
+    if (_imports == failImportAt) {
+      throw const VaultStorageException(
+        VaultStorageException.importFailed,
+        'import failed',
+      );
+    }
+  }
+
+  @override
+  Future<void> appendMarkdown(
+    String vaultId,
+    DateTime date,
+    String markdown,
+  ) async {
+    events.add('append:${date.toIso8601String().substring(0, 10)}');
+    if (appendError != null) throw appendError!;
+  }
+
+  @override
+  Future<void> deleteAttachment(String vaultId, String fileName) async {
+    events.add('delete:$fileName');
+  }
+}
+
 void main() {
   late Directory tmp;
-  late StorageService storage;
+  late DesktopFileVaultStorage storage;
 
   setUp(() {
     tmp = Directory.systemTemp.createTempSync('inbox_test_');
-    storage = StorageService();
+    storage = DesktopFileVaultStorage();
   });
 
   tearDown(() {
@@ -32,6 +120,333 @@ void main() {
 
   String readInbox(String vault, DateTime d) =>
       File(VaultPaths.dailyInboxFile(vault, d)).readAsStringSync();
+
+  test('native request map normalizes only supported attachment fields', () {
+    final input = CaptureInput.fromMap({
+      'text': 'https://example.com',
+      'attachments': [
+        {
+          'uri': 'content://provider/photo/7',
+          'displayName': '照片.png',
+          'mimeType': 'image/png',
+          'extension': 'PNG',
+        },
+        {'uri': 'file:///tmp/rejected.jpg', 'extension': 'jpg'},
+        {'uri': 'content://provider/unsafe', 'extension': 'bad#ext'},
+      ],
+    });
+
+    expect(input.text, 'https://example.com');
+    expect(input.attachments, hasLength(2));
+    expect(input.attachments.first.source, isA<UriAttachmentSource>());
+    expect(input.attachments.first.extension, 'png');
+    expect(input.attachments.last.extension, isEmpty);
+  });
+
+  test(
+    'native request map ignores non-string fields and detects empty input',
+    () {
+      final input = CaptureInput.fromMap({
+        'text': 7,
+        'attachments': [
+          {'uri': 9, 'extension': 'png'},
+          'not-a-map',
+        ],
+      });
+
+      expect(input.text, isNull);
+      expect(input.attachments, isEmpty);
+      expect(input.hasContent, isFalse);
+    },
+  );
+
+  test('captureInput imports then appends with deterministic names', () async {
+    final storage = TransactionRecordingStorage();
+    final service = CaptureService(
+      clipboard: FakeClipboard(const ClipboardContent()),
+      storage: storage,
+      idGenerator: (_) => '20260824-093012-abcd',
+    );
+
+    final result = await service.captureInput(
+      'vault',
+      CaptureInput(
+        text: 'note',
+        attachments: const [
+          CaptureAttachmentInput(
+            source: UriAttachmentSource('content://provider/photo/7'),
+            extension: 'png',
+          ),
+        ],
+      ),
+      now: DateTime(2026, 8, 24, 9, 30, 12),
+    );
+
+    expect(result.status, CaptureStatus.saved);
+    expect(storage.events, [
+      'ensure:vault',
+      'import:20260824-093012-abcd.png',
+      'append:2026-08-24',
+    ]);
+  });
+
+  test('shared image embeds while PDF video and ordinary files link', () async {
+    final storage = RecordingVaultStorage();
+    final service = CaptureService(
+      clipboard: FakeClipboard(const ClipboardContent()),
+      storage: storage,
+      idGenerator: (_) => 'id',
+    );
+
+    final result = await service.captureInput(
+      'vault',
+      const CaptureInput(
+        source: CaptureSource.share,
+        attachments: [
+          CaptureAttachmentInput(
+            source: UriAttachmentSource('content://provider/screenshot'),
+            extension: 'png',
+            mimeType: 'image/png',
+          ),
+          CaptureAttachmentInput(
+            source: UriAttachmentSource('content://provider/document'),
+            extension: 'pdf',
+            mimeType: 'application/pdf',
+            displayName: 'document.pdf',
+          ),
+          CaptureAttachmentInput(
+            source: UriAttachmentSource('content://provider/clip'),
+            extension: 'mp4',
+            mimeType: 'video/mp4',
+            displayName: 'clip.mp4',
+          ),
+          CaptureAttachmentInput(
+            source: UriAttachmentSource('content://provider/license'),
+            extension: '',
+            mimeType: 'application/octet-stream',
+            displayName: 'LICENSE',
+          ),
+        ],
+      ),
+      now: DateTime(2026, 8, 24, 9, 30, 12),
+    );
+
+    expect(result.status, CaptureStatus.saved);
+    expect(storage.appendedMarkdown, contains('![](attachments/id.png)'));
+    expect(
+      storage.appendedMarkdown,
+      contains('[document.pdf](attachments/id-1.pdf)'),
+    );
+    expect(
+      storage.appendedMarkdown,
+      contains('[clip.mp4](attachments/id-2.mp4)'),
+    );
+    expect(storage.appendedMarkdown, contains('[LICENSE](attachments/id-3)'));
+    expect(
+      storage.appendedMarkdown,
+      isNot(contains('![](attachments/id-2.mp4)')),
+    );
+  });
+
+  test(
+    'desktop two-file captures preserve zero-based attachment names',
+    () async {
+      final now = DateTime(2026, 8, 24, 9, 30, 12);
+      final first = File('${tmp.path}/first.png')..writeAsBytesSync([1]);
+      final second = File('${tmp.path}/second.jpg')..writeAsBytesSync([2]);
+      final service = CaptureService(
+        clipboard: FakeClipboard(
+          ClipboardContent(text: 'two files', files: [first.path, second.path]),
+        ),
+        storage: storage,
+        idGenerator: (_) => '20260824-093012-abcd',
+      );
+
+      final result = await service.captureNow(tmp.path, now: now);
+
+      expect(result.status, CaptureStatus.saved);
+      expect(
+        File(
+          '${VaultPaths.attachmentsDir(tmp.path)}/20260824-093012-abcd-0.png',
+        ).existsSync(),
+        isTrue,
+      );
+      expect(
+        File(
+          '${VaultPaths.attachmentsDir(tmp.path)}/20260824-093012-abcd-1.jpg',
+        ).existsSync(),
+        isTrue,
+      );
+      final markdown = readInbox(tmp.path, now);
+      expect(markdown, contains('![](attachments/20260824-093012-abcd-0.png)'));
+      expect(markdown, contains('![](attachments/20260824-093012-abcd-1.jpg)'));
+    },
+  );
+
+  test(
+    'captureNow converts clipboard read failures to a safe error result',
+    () async {
+      final service = CaptureService(
+        clipboard: ThrowingClipboard(),
+        storage: storage,
+      );
+
+      final result = await service.captureNow(
+        tmp.path,
+        now: DateTime(2026, 8, 24),
+      );
+
+      expect(result.status, CaptureStatus.error);
+      expect(result.message, isNull);
+    },
+  );
+
+  test(
+    'captureInput rolls back completed imports when a later import fails',
+    () async {
+      final storage = TransactionRecordingStorage(failImportAt: 2);
+      final service = CaptureService(
+        clipboard: FakeClipboard(const ClipboardContent()),
+        storage: storage,
+        idGenerator: (_) => '20260824-093012-abcd',
+      );
+
+      final result = await service.captureInput(
+        'vault',
+        CaptureInput(
+          attachments: const [
+            CaptureAttachmentInput(
+              source: UriAttachmentSource('content://one'),
+              extension: 'png',
+            ),
+            CaptureAttachmentInput(
+              source: UriAttachmentSource('content://two'),
+              extension: 'jpg',
+            ),
+          ],
+        ),
+        now: DateTime(2026, 8, 24, 9, 30, 12),
+      );
+
+      expect(result.status, CaptureStatus.error);
+      expect(storage.events, isNot(contains(startsWith('append:'))));
+      expect(storage.events.sublist(storage.events.length - 1), [
+        'delete:20260824-093012-abcd.png',
+      ]);
+    },
+  );
+
+  test(
+    'captureInput rolls back imports in reverse when append fails',
+    () async {
+      final storage = TransactionRecordingStorage(
+        appendError: const VaultStorageException(
+          VaultStorageException.appendFailed,
+          'append failed',
+        ),
+      );
+      final service = CaptureService(
+        clipboard: FakeClipboard(const ClipboardContent()),
+        storage: storage,
+        idGenerator: (_) => '20260824-093012-abcd',
+      );
+
+      final result = await service.captureInput(
+        'vault',
+        CaptureInput(
+          attachments: const [
+            CaptureAttachmentInput(
+              source: UriAttachmentSource('content://one'),
+              extension: 'png',
+            ),
+            CaptureAttachmentInput(
+              source: UriAttachmentSource('content://two'),
+              extension: 'jpg',
+            ),
+          ],
+        ),
+        now: DateTime(2026, 8, 24, 9, 30, 12),
+      );
+
+      expect(result.status, CaptureStatus.error);
+      expect(storage.events.sublist(storage.events.length - 2), [
+        'delete:20260824-093012-abcd-1.jpg',
+        'delete:20260824-093012-abcd.png',
+      ]);
+    },
+  );
+
+  test('captureInput serializes overlapping storage transactions', () async {
+    final firstImport = Completer<void>();
+    final storage = TransactionRecordingStorage(
+      firstImportCompleter: firstImport,
+    );
+    final service = CaptureService(
+      clipboard: FakeClipboard(const ClipboardContent()),
+      storage: storage,
+      idGenerator: (_) => 'id',
+    );
+    const input = CaptureInput(
+      attachments: [
+        CaptureAttachmentInput(
+          source: UriAttachmentSource('content://one'),
+          extension: 'png',
+        ),
+      ],
+    );
+
+    final first = service.captureInput(
+      'vault',
+      input,
+      now: DateTime(2026, 8, 24),
+    );
+    final second = service.captureInput(
+      'vault',
+      input,
+      now: DateTime(2026, 8, 25),
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(storage.events, ['ensure:vault', 'import:id.png']);
+
+    firstImport.complete();
+    await Future.wait([first, second]);
+    expect(storage.events, [
+      'ensure:vault',
+      'import:id.png',
+      'append:2026-08-24',
+      'ensure:vault',
+      'import:id.png',
+      'append:2026-08-25',
+    ]);
+  });
+
+  test('captureInput maps typed storage failures to stable statuses', () async {
+    for (final entry in <({String code, CaptureStatus status})>[
+      (
+        code: VaultStorageException.vaultUnavailable,
+        status: CaptureStatus.vaultUnavailable,
+      ),
+      (
+        code: VaultStorageException.permissionDenied,
+        status: CaptureStatus.permissionDenied,
+      ),
+    ]) {
+      final storage = TransactionRecordingStorage(
+        appendError: VaultStorageException(entry.code, 'storage message'),
+      );
+      final service = CaptureService(
+        clipboard: FakeClipboard(const ClipboardContent()),
+        storage: storage,
+      );
+      final result = await service.captureInput(
+        'vault',
+        const CaptureInput(text: 'note'),
+        now: DateTime(2026, 8, 24),
+      );
+      expect(result.status, entry.status);
+      expect(result.message, 'storage message');
+    }
+  });
 
   test('两个桌面平台共享 Universal Capture 路径协议', () {
     final now = DateTime(2026, 8, 21, 10, 32, 15);
@@ -48,7 +463,7 @@ void main() {
     expect(VaultPaths.embedRef('image.png'), 'attachments/image.png');
   });
 
-  test('平台适配器输入相同 Capture 时生成完全相同的 Markdown', () {
+  test('平台适配器输入相同 Capture 时生成完全相同的 Markdown', () async {
     final now = DateTime(2026, 8, 21, 10, 32, 15);
     final macVault = Directory('${tmp.path}/macos')..createSync();
     final windowsVault = Directory('${tmp.path}/windows')..createSync();
@@ -65,8 +480,12 @@ void main() {
         ),
       ],
     );
-    storage.appendCapture(macVault.path, sharedCapture);
-    storage.appendCapture(windowsVault.path, sharedCapture);
+    final markdown = const MarkdownFormatter().format(sharedCapture);
+    final date = DateTime(now.year, now.month, now.day);
+    await storage.ensureLayout(macVault.path);
+    await storage.appendMarkdown(macVault.path, date, markdown);
+    await storage.ensureLayout(windowsVault.path);
+    await storage.appendMarkdown(windowsVault.path, date, markdown);
 
     expect(readInbox(macVault.path, now), readInbox(windowsVault.path, now));
   });
@@ -99,6 +518,33 @@ void main() {
     expect(md, contains('一段笔记内容')); // trim 生效
     expect(md, endsWith('---\n\n'));
   });
+
+  test(
+    'CaptureService awaits storage and appends the exact formatted Markdown',
+    () async {
+      final storage = RecordingVaultStorage();
+      final svc = CaptureService(
+        clipboard: FakeClipboard(const ClipboardContent(text: '  一段笔记内容  ')),
+        storage: storage,
+      );
+
+      final result = await svc.captureNow(
+        'vault-id',
+        now: DateTime(2026, 8, 24, 9, 30, 12),
+      );
+
+      expect(result.isSaved, isTrue);
+      expect(storage.appendedMarkdown, '''## 09:30
+
+<!-- capture:id=${result.captureId} -->
+
+一段笔记内容
+
+---
+
+''');
+    },
+  );
 
   test('连续 10 条：全部追加、不覆盖、顺序正确、ID 唯一', () async {
     final base = DateTime(2026, 8, 21, 9, 0, 0);

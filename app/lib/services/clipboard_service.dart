@@ -1,5 +1,8 @@
 import 'package:flutter/services.dart';
 
+import '../models/capture_input.dart';
+import 'vault_storage.dart';
+
 /// 一次剪贴板读取的结果。
 ///
 /// - 纯文字：[text] 非空。
@@ -27,6 +30,51 @@ class ClipboardContent {
       (text != null && text!.trim().isNotEmpty) ||
       imageBytes != null ||
       files.isNotEmpty;
+
+  CaptureInput toCaptureInput() {
+    final attachments = <CaptureAttachmentInput>[];
+    if (files.isNotEmpty) {
+      for (final file in files) {
+        attachments.add(
+          CaptureAttachmentInput(
+            source: FileAttachmentSource(file),
+            extension: _extensionOf(file),
+            displayName: _baseNameOf(file),
+          ),
+        );
+      }
+    } else if (imageBytes != null) {
+      final extension = _safeExtension(imageExtension);
+      attachments.add(
+        CaptureAttachmentInput(
+          source: BytesAttachmentSource(imageBytes!),
+          extension: extension.isEmpty ? 'png' : extension,
+          mimeType: imageMimeType,
+        ),
+      );
+    }
+    return CaptureInput(
+      source: CaptureSource.desktopClipboard,
+      text: text,
+      attachments: List.unmodifiable(attachments),
+      usesDesktopFileNames: files.isNotEmpty,
+    );
+  }
+
+  static String _extensionOf(String path) {
+    final fileName = _baseNameOf(path);
+    final dot = fileName.lastIndexOf('.');
+    if (dot <= 0 || dot == fileName.length - 1) return '';
+    return _safeExtension(fileName.substring(dot + 1));
+  }
+
+  static String _safeExtension(String extension) {
+    final normalized = extension.toLowerCase();
+    return RegExp(r'^[a-z0-9]+$').hasMatch(normalized) ? normalized : '';
+  }
+
+  static String _baseNameOf(String path) =>
+      path.replaceAll('\\', '/').split('/').last;
 }
 
 /// 剪贴板读取接口，便于测试时注入假实现。
