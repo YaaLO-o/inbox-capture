@@ -42,6 +42,8 @@ class ControlCenterView extends StatefulWidget {
 class _ControlCenterViewState extends State<ControlCenterView> {
   DisplayMethod _method = DisplayMethod.inbox;
   bool _loadingPref = true;
+  bool _assistantVisible = true;
+  bool _loadingAssistant = true;
   bool _changingFolder = false;
   String? _folderError;
   Future<AppVersion>? _versionFuture;
@@ -50,7 +52,22 @@ class _ControlCenterViewState extends State<ControlCenterView> {
   void initState() {
     super.initState();
     _loadPref();
+    _loadAssistantVisibility();
     _versionFuture = widget.settings.getAppVersion();
+  }
+
+  Future<void> _loadAssistantVisibility() async {
+    final visible = await widget.settings.getAssistantVisible();
+    if (!mounted) return;
+    setState(() {
+      _assistantVisible = visible;
+      _loadingAssistant = false;
+    });
+  }
+
+  Future<void> _setAssistantVisible(bool visible) async {
+    setState(() => _assistantVisible = visible);
+    await widget.settings.setAssistantVisible(visible);
   }
 
   Future<void> _loadPref() async {
@@ -292,6 +309,26 @@ class _ControlCenterViewState extends State<ControlCenterView> {
                           height: 1.5,
                         ),
                       ),
+                      const SizedBox(height: 18),
+                      SwitchListTile(
+                        key: const Key('floating-assistant-switch'),
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text(
+                          'Floating Assistant',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                        subtitle: const Text(
+                          '显示桌面宝箱怪；关闭后菜单栏 Capture 仍可使用。',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: Color(0xFF8A8A96),
+                          ),
+                        ),
+                        value: _assistantVisible,
+                        onChanged: _loadingAssistant
+                            ? null
+                            : _setAssistantVisible,
+                      ),
                       const SizedBox(height: 22),
                       Row(
                         children: [
@@ -333,7 +370,7 @@ class _ControlCenterViewState extends State<ControlCenterView> {
                           ),
                           TextButton(
                             onPressed: widget.onClose,
-                            child: const Text('返回桌宠'),
+                            child: const Text('关闭'),
                           ),
                         ],
                       ),

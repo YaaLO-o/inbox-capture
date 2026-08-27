@@ -29,6 +29,13 @@ class SettingsService {
   Future<void> setDisplayMethod(String method) =>
       _channel.invokeMethod('setDisplayMethod', {'method': method});
 
+  /// Floating Assistant 是否显示。Core 与菜单栏不受此偏好影响。
+  Future<bool> getAssistantVisible() async =>
+      await _channel.invokeMethod<bool>('getAssistantVisible') ?? true;
+
+  Future<void> setAssistantVisible(bool visible) =>
+      _channel.invokeMethod('setAssistantVisible', {'visible': visible});
+
   /// 只恢复仍然存在的目录。验证过程绝不创建路径。
   Future<String?> loadValidVaultPath() async {
     final path = await getVaultPath();

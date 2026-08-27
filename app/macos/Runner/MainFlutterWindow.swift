@@ -14,6 +14,7 @@ struct WindowDragSession {
 }
 
 class MainFlutterWindow: NSWindow, NSWindowDelegate {
+  let assistantVisibilityStore = AssistantVisibilityStore()
   /// 持住 Flutter 视图控制器，切换窗口样式时需要同步其背景色。
   private weak var flutterViewController: FlutterViewController?
 
@@ -35,6 +36,12 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
     SettingsChannel.register(with: flutterViewController)
 
     super.awakeFromNib()
+
+    if initialWindowSize() == NSSize(width: 132, height: 132) {
+      DispatchQueue.main.async { [weak self] in
+        self?.restoreAssistantVisibility()
+      }
+    }
   }
 
   // MARK: - 窗口样式切换
@@ -71,6 +78,27 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
   /// 切回悬浮入口样式：无标题栏、置顶透明、右上角 132×132。
   func applyFloatingWindowStyle() {
     applyFloatingWindowStyle(initialSize: NSSize(width: 132, height: 132))
+  }
+
+  /// Floating Assistant visibility is independent from Core process lifetime.
+  func setAssistantVisible(_ visible: Bool) {
+    assistantVisibilityStore.setVisible(visible)
+    guard !isStandardMode else { return }
+    if visible {
+      makeKeyAndOrderFront(nil)
+      NSApp.activate(ignoringOtherApps: true)
+    } else {
+      orderOut(nil)
+    }
+  }
+
+  func restoreAssistantVisibility() {
+    guard !isStandardMode else { return }
+    if assistantVisibilityStore.isVisible {
+      makeKeyAndOrderFront(nil)
+    } else {
+      orderOut(nil)
+    }
   }
 
   /// 悬浮样式：启动时按是否已配置 Vault 决定初始尺寸，运行时回退固定 132²。
@@ -127,9 +155,11 @@ class MainFlutterWindow: NSWindow, NSWindowDelegate {
         )
         channel.invokeMethod("mainWindowDidClose", arguments: nil)
       }
+      restoreAssistantVisibility()
       return false
     }
-    return true
+    setAssistantVisible(false)
+    return false
   }
 
   /// 决定启动时窗口尺寸：与 Dart 端 WindowSizes 保持一致。

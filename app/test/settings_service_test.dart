@@ -111,6 +111,28 @@ void main() {
     expect(calls[1].arguments, {'method': 'system'});
   });
 
+  test(
+    'assistant visibility round-trips through the native boundary',
+    () async {
+      final calls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        calls.add(call);
+        if (call.method == 'getAssistantVisible') return false;
+        return null;
+      });
+
+      final settings = SettingsService();
+      expect(await settings.getAssistantVisible(), isFalse);
+      await settings.setAssistantVisible(true);
+
+      expect(calls.map((c) => c.method), [
+        'getAssistantVisible',
+        'setAssistantVisible',
+      ]);
+      expect(calls.last.arguments, {'visible': true});
+    },
+  );
+
   test('revealPath / openPath / openExternalUrl / setWindowMode pass args',
       () async {
     final calls = <MethodCall>[];

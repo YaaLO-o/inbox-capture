@@ -6,7 +6,9 @@ import 'services/android_capture_dispatcher.dart';
 import 'services/android_saf_vault_storage.dart';
 import 'services/android_vault_settings.dart';
 import 'services/capture_service.dart';
+import 'services/capture_coordinator.dart';
 import 'services/clipboard_service.dart';
+import 'services/core_bridge.dart';
 import 'services/desktop_file_vault_storage.dart';
 import 'services/display_service.dart';
 import 'services/settings_service.dart';
@@ -64,6 +66,8 @@ enum _UpdateOrigin { pill, controlCenter }
 class _InboxAppState extends State<InboxApp> {
   late final SettingsService _settings;
   late final CaptureService _capture;
+  late final CaptureCoordinator _captureCoordinator;
+  CoreBridge? _coreBridge;
   late final UpdateService _updates;
   late final VaultStorage _storage;
   late final DisplayService _display;
@@ -87,9 +91,33 @@ class _InboxAppState extends State<InboxApp> {
       clipboard: ClipboardService(),
       storage: _storage,
     );
+    if (defaultTargetPlatform == TargetPlatform.macOS) {
+      _coreBridge = CoreBridge();
+    }
+    _captureCoordinator = CaptureCoordinator(
+      captureService: _capture,
+      onStatusChanged: (status) {
+        _coreBridge?.reportCaptureStatus(status);
+      },
+    );
+    _coreBridge?.setHandlers(
+      onCapture: () async {
+        await _captureCoordinator.capture(_vaultPath);
+      },
+      onOpenInbox: _openReaderFromCore,
+      onOpenHistory: _openReaderFromCore,
+      onOpenSettings: _openControlCenter,
+    );
     // 原生红叉把标准窗口切回悬浮宠物时，复位 Dart 侧的模式状态。
     _settings.setMainWindowClosedHandler(_onNativeWindowClosed);
     _boot();
+  }
+
+  @override
+  void dispose() {
+    _captureCoordinator.dispose();
+    _coreBridge?.dispose();
+    super.dispose();
   }
 
   /// 原生关闭按钮 → 悬浮宠物：标准窗口相关模式全部复位。
@@ -195,7 +223,10 @@ class _InboxAppState extends State<InboxApp> {
   // 控制中心：标准 macOS 窗口，桌宠暂时隐藏。
   Future<void> _openControlCenter() async {
     final path = _vaultPath;
-    if (path == null) return;
+    if (path == null) {
+      await _settings.showWindow();
+      return;
+    }
     await _settings.setWindowSize(
       WindowSizes.controlCenterWidth,
       WindowSizes.controlCenterHeight,
@@ -204,6 +235,25 @@ class _InboxAppState extends State<InboxApp> {
     await _settings.setWindowMode('standard');
     if (!mounted) return;
     setState(() => _showingControlCenter = true);
+  }
+
+  Future<void> _openReaderFromCore() async {
+    final path = _vaultPath;
+    if (path == null) {
+      await _settings.showWindow();
+      return;
+    }
+    await _settings.setWindowSize(
+      WindowSizes.readerWidth,
+      WindowSizes.readerHeight,
+      animate: false,
+    );
+    await _settings.setWindowMode('standard');
+    if (!mounted) return;
+    setState(() {
+      _showingControlCenter = true;
+      _showingReader = true;
+    });
   }
 
   Future<void> _closeControlCenter() async {
@@ -292,8 +342,7 @@ class _InboxAppState extends State<InboxApp> {
     }
 
     return CapturePill(
-      vaultPath: path,
-      capture: _capture,
+      onCapture: () => _captureCoordinator.capture(path),
       onChangeVault: _changeVault,
       onCheckUpdates: () => _showUpdates(),
       onOpenControlCenter: _openControlCenter,

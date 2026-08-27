@@ -14,16 +14,14 @@ import 'window_sizes.dart';
 
 /// 两个平台共用的低摩擦悬浮采集入口。
 class CapturePill extends StatefulWidget {
-  final String vaultPath;
-  final CaptureService capture;
+  final Future<CaptureResult> Function() onCapture;
   final void Function() onChangeVault;
   final void Function() onCheckUpdates;
   final void Function() onOpenControlCenter;
 
   const CapturePill({
     super.key,
-    required this.vaultPath,
-    required this.capture,
+    required this.onCapture,
     required this.onChangeVault,
     required this.onCheckUpdates,
     required this.onOpenControlCenter,
@@ -90,8 +88,7 @@ class _CapturePillState extends State<CapturePill> {
                   children: [
                     PixelChestPet(
                       atlas: atlas,
-                      onCapture: () =>
-                          widget.capture.captureNow(widget.vaultPath),
+                      onCapture: widget.onCapture,
                       onMove: defaultTargetPlatform == TargetPlatform.windows
                           ? (delta) =>
                                 _settings.moveWindowBy(delta.dx, delta.dy)

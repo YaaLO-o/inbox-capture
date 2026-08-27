@@ -23,6 +23,7 @@ void main() {
     messenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
       if (call.method == 'getDisplayMethod') return 'inbox';
+      if (call.method == 'getAssistantVisible') return true;
       if (call.method == 'getAppVersion') return '1.1.1';
       if (call.method == 'revealPath' ||
           call.method == 'openPath' ||
@@ -69,10 +70,30 @@ void main() {
     expect(find.text('Obsidian'), findsOneWidget);
     expect(find.text('查看内容'), findsOneWidget);
     expect(find.text('检查更新'), findsOneWidget);
-    expect(find.text('返回桌宠'), findsOneWidget);
+    expect(find.text('关闭'), findsOneWidget);
+    expect(find.text('Floating Assistant'), findsOneWidget);
     expect(find.textContaining('INbox 1.1.1'), findsOneWidget);
     // 当前存储路径可见。
     expect(find.textContaining(tmp.path), findsOneWidget);
+  });
+
+  testWidgets('Floating Assistant 开关持久化隐藏状态', (tester) async {
+    await tester.pumpWidget(pump());
+    await tester.pumpAndSettle();
+
+    final toggle = find.byKey(const Key('floating-assistant-switch'));
+    await tester.drag(
+      find.byType(SingleChildScrollView),
+      const Offset(0, -240),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+
+    final setCall = calls.firstWhere(
+      (call) => call.method == 'setAssistantVisible',
+    );
+    expect(setCall.arguments, {'visible': false});
   });
 
   testWidgets('打开存储文件夹按钮触发 revealPath', (tester) async {
@@ -100,7 +121,7 @@ void main() {
     expect(setCall.arguments, {'method': 'obsidian'});
   });
 
-  testWidgets('检查更新 / 查看内容 / 返回桌宠 触发各自回调', (tester) async {
+  testWidgets('检查更新 / 查看内容 / 关闭 触发各自回调', (tester) async {
     var checks = 0, opens = 0, closes = 0;
     await tester.pumpWidget(pump(
       onCheckUpdates: () => checks += 1,
@@ -111,7 +132,7 @@ void main() {
 
     await tester.tap(find.text('检查更新'));
     await tester.tap(find.text('查看内容'));
-    await tester.tap(find.text('返回桌宠'));
+    await tester.tap(find.text('关闭'));
     await tester.pump();
 
     expect(checks, 1);
@@ -127,6 +148,7 @@ void main() {
     messenger.setMockMethodCallHandler(channel, (call) async {
       calls.add(call);
       if (call.method == 'getDisplayMethod') return 'inbox';
+      if (call.method == 'getAssistantVisible') return true;
       if (call.method == 'getAppVersion') return '1.1.1';
       if (call.method == 'pickFolder') return newFolder.path;
       return null;

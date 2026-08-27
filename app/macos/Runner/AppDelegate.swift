@@ -3,6 +3,19 @@ import FlutterMacOS
 
 @main
 class AppDelegate: FlutterAppDelegate {
+  private var menuBarController: MenuBarController?
+
+  override func applicationDidFinishLaunching(_ notification: Notification) {
+    super.applicationDidFinishLaunching(notification)
+    guard let window = mainFlutterWindow as? MainFlutterWindow,
+          let controller = window.contentViewController as? FlutterViewController else { return }
+    menuBarController = MenuBarController(
+      controller: controller,
+      window: window,
+      visibilityStore: window.assistantVisibilityStore
+    )
+  }
+
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
     // 悬浮入口关闭不应直接退出应用；通过右键菜单或更新流程结束。
     return false
@@ -13,7 +26,7 @@ class AppDelegate: FlutterAppDelegate {
     hasVisibleWindows flag: Bool
   ) -> Bool {
     if !flag {
-      mainFlutterWindow?.makeKeyAndOrderFront(nil)
+      (mainFlutterWindow as? MainFlutterWindow)?.setAssistantVisible(true)
     }
     sender.activate(ignoringOtherApps: true)
     return true
@@ -137,6 +150,21 @@ enum SettingsChannel {
         }
         UserDefaults.standard.set(method, forKey: displayMethodKey)
         result(nil)
+      case "getAssistantVisible":
+        guard let window = controller.view.window as? MainFlutterWindow else {
+          result(true)
+          return
+        }
+        result(window.assistantVisibilityStore.isVisible)
+      case "setAssistantVisible":
+        guard let args = call.arguments as? [String: Any],
+              let visible = args["visible"] as? Bool,
+              let window = controller.view.window as? MainFlutterWindow else {
+          result(FlutterError(code: "BAD_ARGS", message: "setAssistantVisible 需要 visible", details: nil))
+          return
+        }
+        window.setAssistantVisible(visible)
+        result(nil)
       case "pickFolder":
         result(pickFolder())
       case "revealPath":
@@ -183,6 +211,7 @@ enum SettingsChannel {
           window.applyStandardWindowStyle()
         case "floating":
           window.applyFloatingWindowStyle()
+          window.restoreAssistantVisibility()
         default:
           result(FlutterError(code: "BAD_ARGS", message: "mode 必须是 standard|floating", details: nil))
           return

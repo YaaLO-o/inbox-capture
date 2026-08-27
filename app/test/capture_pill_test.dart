@@ -64,8 +64,7 @@ void main() {
   }) async {
     await tester.pumpWidget(
       CapturePill(
-        vaultPath: '/unused',
-        capture: capture,
+        onCapture: () => capture.captureNow('/unused'),
         onChangeVault: onChangeVault ?? () {},
         onCheckUpdates: onCheckUpdates ?? () {},
         onOpenControlCenter: onOpenControlCenter ?? () {},

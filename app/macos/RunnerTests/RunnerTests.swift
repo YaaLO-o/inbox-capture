@@ -5,6 +5,31 @@ import XCTest
 
 class RunnerTests: XCTestCase {
 
+  func testCaptureFeedbackStatusUsesBlackGreenRedSemantics() {
+    XCTAssertEqual(CaptureFeedbackStatus(nativeValue: "idle"), .idle)
+    XCTAssertEqual(CaptureFeedbackStatus(nativeValue: "success"), .success)
+    XCTAssertEqual(CaptureFeedbackStatus(nativeValue: "failure"), .failure)
+    XCTAssertNil(CaptureFeedbackStatus(nativeValue: "saved"))
+    XCTAssertEqual(CaptureFeedbackStatus.idle.color, .black)
+    XCTAssertEqual(CaptureFeedbackStatus.success.color, .systemGreen)
+    XCTAssertEqual(CaptureFeedbackStatus.failure.color, .systemRed)
+  }
+
+  func testAssistantVisibilityDefaultsToVisibleAndPersistsChanges() {
+    let suiteName = "RunnerTests.AssistantVisibility.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let store = AssistantVisibilityStore(defaults: defaults)
+
+    XCTAssertTrue(store.isVisible)
+
+    store.setVisible(false)
+    XCTAssertFalse(store.isVisible)
+
+    store.setVisible(true)
+    XCTAssertTrue(store.isVisible)
+  }
+
   func testWindowDragUsesAbsoluteScreenDelta() {
     let session = WindowDragSession(
       mouseOrigin: NSPoint(x: 400, y: 300),
