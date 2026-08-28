@@ -21,6 +21,16 @@
 
 </div>
 
+<div align="center">
+
+<a href="https://github.com/YaaLO-o/inbox-capture/releases/download/v1.2.0/inbox-demo.mp4">
+  <img src="docs/assets/inbox-demo-poster.jpg" width="720" alt="INbox 20 秒产品演示：在网页复制内容，点击菜单栏宝箱怪，内容立刻收进自己的库">
+</a>
+
+**▶ 20 秒产品演示：复制内容 → 点击宝箱怪 → 收进你的库（点击图片播放视频）**
+
+</div>
+
 ![像素宝箱怪桌宠：待机 → 采集 → 开心收下](docs/assets/pet-hero.png)
 
 ## 它解决什么问题
