@@ -23,11 +23,7 @@
 
 <div align="center">
 
-<a href="https://github.com/YaaLO-o/inbox-capture/releases/download/v1.2.0/inbox-demo.mp4">
-  <img src="docs/assets/inbox-demo-poster.jpg" width="720" alt="INbox 20 秒产品演示：在网页复制内容，点击菜单栏宝箱怪，内容立刻收进自己的库">
-</a>
-
-**▶ 20 秒产品演示：复制内容 → 点击宝箱怪 → 收进你的库（点击图片播放视频）**
+https://github.com/user-attachments/assets/644d9d38-2af3-4bf9-bc80-bc630ab66b4e
 
 </div>
 
