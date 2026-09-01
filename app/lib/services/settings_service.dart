@@ -38,7 +38,7 @@ class SettingsService {
     return null;
   }
 
-  /// 弹出原生 NSOpenPanel 让用户选择一个目录。
+  /// 弹出原生目录选择器（NSOpenPanel / Windows IFileDialog）。
   /// 返回选中的绝对路径，取消时返回 null。
   Future<String?> pickFolder() => _channel.invokeMethod<String>('pickFolder');
 
@@ -60,16 +60,26 @@ class SettingsService {
   Future<void> setWindowMode(String mode) =>
       _channel.invokeMethod('setWindowMode', {'mode': mode});
 
-  /// 原生红叉把标准窗口切回悬浮宠物时回调。
-  ///
-  /// 注意：MethodChannel 只支持一个 Dart 侧 handler；本应用 settings 通道
-  /// 目前没有其他入向调用，注册这里是安全的。
-  void setMainWindowClosedHandler(void Function() handler) {
+  /// 在同一个 handler 中分发窗口和托盘事件，避免覆盖 macOS 关闭回调。
+  void setMainWindowClosedHandler(
+    void Function() handler, {
+    Future<void> Function(String action)? onTrayAction,
+  }) {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'mainWindowDidClose') handler();
+      if (call.method == 'trayAction' && call.arguments is String) {
+        await onTrayAction?.call(call.arguments as String);
+      }
       return null;
     });
   }
+
+  void clearDesktopEventHandlers() => _channel.setMethodCallHandler(null);
+
+  Future<void> hideWindow() => _channel.invokeMethod('hideWindow');
+
+  Future<void> showError(String message) =>
+      _channel.invokeMethod('showError', {'message': message});
 
   Future<AppVersion> getAppVersion() async {
     final value = await _channel.invokeMethod<String>('getAppVersion');
@@ -103,8 +113,11 @@ class SettingsService {
 
   Future<void> endWindowDrag() => _channel.invokeMethod('endWindowDrag');
 
-  Future<void> installUpdate(String dmgPath) =>
-      _channel.invokeMethod('installUpdate', {'dmgPath': dmgPath});
+  Future<void> installUpdate(String packagePath) => _channel.invokeMethod(
+    'installUpdate',
+    // dmgPath 保持 macOS 原生边界兼容；path 是新的跨平台参数。
+    {'path': packagePath, 'dmgPath': packagePath},
+  );
 
   /// 退出应用。
   Future<void> quit() => _channel.invokeMethod('quit');

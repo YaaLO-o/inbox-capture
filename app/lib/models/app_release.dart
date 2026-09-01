@@ -47,21 +47,33 @@ class AppVersion implements Comparable<AppVersion> {
 }
 
 class AppRelease {
-  static const String assetName = 'INbox-macos-universal.dmg';
+  static const String macOSAssetName = 'INbox-macos-universal.dmg';
+  static const String windowsAssetName = 'INbox-windows-x64.zip';
 
   final AppVersion version;
-  final Uri downloadUrl;
-  final String digest;
-  final int size;
+  final String? assetName;
+  final Uri? downloadUrl;
+  final String? digest;
+  final int? size;
 
   const AppRelease({
     required this.version,
-    required this.downloadUrl,
-    required this.digest,
-    required this.size,
+    this.assetName,
+    this.downloadUrl,
+    this.digest,
+    this.size,
   });
 
-  factory AppRelease.fromGitHubJson(Map<String, Object?> json) {
+  bool get hasDownload =>
+      assetName != null &&
+      downloadUrl != null &&
+      digest != null &&
+      size != null;
+
+  factory AppRelease.fromGitHubJson(
+    Map<String, Object?> json, {
+    required String assetName,
+  }) {
     final version = AppVersion.parse(_readString(json, 'tag_name'));
     final assets = json['assets'];
     if (assets is! List) {
@@ -71,7 +83,9 @@ class AppRelease {
     Map<String, Object?>? matchedAsset;
     for (final asset in assets) {
       if (asset is! Map) continue;
-      final candidate = Map<String, Object?>.from(asset.cast<Object?, Object?>());
+      final candidate = Map<String, Object?>.from(
+        asset.cast<Object?, Object?>(),
+      );
       if (candidate['name'] == assetName) {
         matchedAsset = candidate;
         break;
@@ -79,12 +93,13 @@ class AppRelease {
     }
 
     if (matchedAsset == null) {
-      throw const FormatException('GitHub release asset is missing');
+      return AppRelease(version: version);
     }
 
     final digest = _readString(matchedAsset, 'digest');
     const digestPrefix = 'sha256:';
-    if (!digest.startsWith(digestPrefix) || digest.length <= digestPrefix.length) {
+    if (!digest.startsWith(digestPrefix) ||
+        digest.length <= digestPrefix.length) {
       throw const FormatException('GitHub release digest is invalid');
     }
 
@@ -95,6 +110,7 @@ class AppRelease {
 
     return AppRelease(
       version: version,
+      assetName: assetName,
       downloadUrl: Uri.parse(_readString(matchedAsset, 'browser_download_url')),
       digest: digest.substring(digestPrefix.length),
       size: size,

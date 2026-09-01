@@ -9,7 +9,7 @@
 <div>
     <a href="#安装"><img alt="macOS" src="https://img.shields.io/badge/-macOS%20Universal-black?style=flat-square&logo=apple&logoColor=white" /></a>
     <a href="#android-个人侧载"><img alt="Android" src="https://img.shields.io/badge/-Android%2010%2B-3DDC84?style=flat-square&logo=android&logoColor=white" /></a>
-    <a href="https://github.com/YaaLO-o/inbox-capture/releases"><img alt="Windows" src="https://img.shields.io/badge/-Windows%20%E8%A7%84%E5%88%92%E4%B8%AD-blue?style=flat-square&logo=windows&logoColor=white" /></a>
+    <a href="https://github.com/YaaLO-o/inbox-capture/releases/latest/download/INbox-windows-x64.zip"><img alt="Windows" src="https://img.shields.io/badge/-Windows%2010%2F11-blue?style=flat-square&logo=windows&logoColor=white" /></a>
 </div>
 
 <p>
@@ -62,7 +62,17 @@ INbox 的设计原则是"你的东西只属于你"：
 
 ## 安装
 
-### 方式一：终端一键安装（推荐）
+### Windows 10 / 11（x64）
+
+<a href="https://github.com/YaaLO-o/inbox-capture/releases/latest/download/INbox-windows-x64.zip"><b>⬇ 下载 INbox for Windows（x64）</b></a>
+
+下载后解压整个 ZIP，再双击 `inbox_app.exe` 即可使用。请保留解压后的完整文件夹，不要只移动其中的 EXE。首次启动若出现 Windows SmartScreen 提示，请选择「更多信息」→「仍要运行」；当前版本尚未使用代码签名证书。
+
+以后可以在 INbox 控制中心点击「检查更新」。应用会直接显示是否有新版本；有更新时可在应用内下载、校验、安装并重新启动，不需要跳转网页。
+
+### macOS
+
+#### 方式一：终端一键安装（推荐）
 
 复制下面这行到「终端」回车，会自动下载最新版并安装到 `/Applications/INbox.app`。
 
@@ -74,7 +84,7 @@ curl -fsSL https://raw.githubusercontent.com/YaaLO-o/inbox-capture/main/scripts/
 
 正在使用旧版本时，运行一次这条命令即可升级到最新版。之后可以直接在 INbox 里右键桌宠 →「控制中心」→「检查更新」自动升级。
 
-### 方式二：手动下载 DMG
+#### 方式二：手动下载 DMG
 
 <a href="https://github.com/YaaLO-o/inbox-capture/releases/latest/download/INbox-macos-universal.dmg"><b>⬇ 下载 INbox for macOS（Universal DMG）</b></a>
 
@@ -84,13 +94,13 @@ curl -fsSL https://raw.githubusercontent.com/YaaLO-o/inbox-capture/main/scripts/
 
 支持 Apple Silicon（M 系列）和 Intel 芯片。
 
-### 应用内更新
+#### 应用内更新
 
 正常更新时，右键桌宠 →「控制中心」→「检查更新」。INbox 会在本机校验下载文件，校验成功后替换 `/Applications/INbox.app` 并重新打开。网络断开、校验失败或安装失败时，当前版本会保留。
 
 上面的终端命令仍然保留。当菜单更新无法打开，或一次更新被中断时，可以用它恢复到最新版。
 
-### 窗口与退出
+#### 窗口与退出
 
 INbox 平时以悬浮桌宠形式运行（无 Dock 图标）。右键桌宠可以打开控制中心、更改存储文件夹、检查更新或退出。在控制中心/阅读器等标准窗口里点红色关闭按钮，会回到悬浮桌宠而不退出进程。需要重新唤回窗口时，从 Applications 或 Spotlight 再次打开 INbox 即可。需要结束进程时，右键桌宠 →「退出 INbox」。
 
@@ -135,7 +145,7 @@ INbox 把内容写进你选择的存储文件夹（标准 Markdown + attachments
 
 ## 从源码构建
 
-需要 Flutter 3.47.1、Dart 3.13.1、Xcode（Swift Package Manager，无需 CocoaPods）。
+需要 Flutter 3.47.1、Dart 3.13.1。构建 macOS 版需要 Xcode（Swift Package Manager，无需 CocoaPods）；构建 Windows 版需要 Visual Studio 2022 的「使用 C++ 的桌面开发」工作负载。
 
 ```bash
 cd app
@@ -152,6 +162,13 @@ cd ..
 sh scripts/release_macos.sh 1.1.1
 ```
 
+Windows PowerShell：
+
+```powershell
+cd app
+flutter build windows --release
+```
+
 项目用 Flutter 共享一套 Dart 代码（模型、采集逻辑、存储、UI），macOS 和 Windows 各有很薄的原生适配层（剪贴板、文件夹选择、窗口控制）。
 
 ## 路线图
@@ -161,7 +178,7 @@ sh scripts/release_macos.sh 1.1.1
 - ✅ 开放文件存储 + 可切换展示层（应用内只读查看 / 系统默认 Markdown 应用 / Obsidian）
 - ✅ App 内更新（下载进度、SHA-256 校验、原子替换、失败回滚）
 - ✅ Android 文字 / 图片 / 文件系统分享与剪贴板悬浮球 MVP（Android 10+ 个人侧载版）
-- 🚧 Windows 适配（代码已完成，待真机首次编译验证）
+- ✅ Windows 10 / 11 x64 文字、图片、文件采集，桌宠入口与应用内更新
 - ⏳ AI 分类、标签、摘要、语义搜索（基于 `capture:id`）
 - ⏳ Apple Developer ID 签名与公证，免去首次打开提示
 

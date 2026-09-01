@@ -92,19 +92,21 @@ class _CapturePillState extends State<CapturePill> {
                       atlas: atlas,
                       onCapture: () =>
                           widget.capture.captureNow(widget.vaultPath),
-                      onMove: defaultTargetPlatform == TargetPlatform.windows
-                          ? (delta) =>
-                                _settings.moveWindowBy(delta.dx, delta.dy)
-                          : (_) {},
+                      onMove: (_) {},
                       onSecondaryTap: (_) => _toggleMenu(),
-                      onDragStart: defaultTargetPlatform == TargetPlatform.macOS
+                      onDragStart:
+                          defaultTargetPlatform == TargetPlatform.macOS ||
+                              defaultTargetPlatform == TargetPlatform.windows
                           ? _settings.beginWindowDrag
                           : null,
                       onDragUpdate:
-                          defaultTargetPlatform == TargetPlatform.macOS
+                          defaultTargetPlatform == TargetPlatform.macOS ||
+                              defaultTargetPlatform == TargetPlatform.windows
                           ? _settings.updateWindowDrag
                           : null,
-                      onDragEnd: defaultTargetPlatform == TargetPlatform.macOS
+                      onDragEnd:
+                          defaultTargetPlatform == TargetPlatform.macOS ||
+                              defaultTargetPlatform == TargetPlatform.windows
                           ? _settings.endWindowDrag
                           : null,
                     ),

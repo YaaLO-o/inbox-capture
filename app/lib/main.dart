@@ -47,12 +47,7 @@ class InboxApp extends StatefulWidget {
   final UpdateService? updateService;
   final VaultStorage? storage;
 
-  const InboxApp({
-    super.key,
-    this.settings,
-    this.updateService,
-    this.storage,
-  });
+  const InboxApp({super.key, this.settings, this.updateService, this.storage});
 
   @override
   State<InboxApp> createState() => _InboxAppState();
@@ -74,7 +69,10 @@ class _InboxAppState extends State<InboxApp> {
   bool _showingUpdate = false;
   bool _showingControlCenter = false;
   bool _showingReader = false;
+  bool _changingVault = false;
   _UpdateOrigin _updateOrigin = _UpdateOrigin.pill;
+
+  bool get _isWindows => defaultTargetPlatform == TargetPlatform.windows;
 
   @override
   void initState() {
@@ -83,12 +81,12 @@ class _InboxAppState extends State<InboxApp> {
     _updates = widget.updateService ?? UpdateService();
     _storage = widget.storage ?? const DesktopFileVaultStorage();
     _display = DisplayService(settings: _settings);
-    _capture = CaptureService(
-      clipboard: ClipboardService(),
-      storage: _storage,
-    );
+    _capture = CaptureService(clipboard: ClipboardService(), storage: _storage);
     // 原生红叉把标准窗口切回悬浮宠物时，复位 Dart 侧的模式状态。
-    _settings.setMainWindowClosedHandler(_onNativeWindowClosed);
+    _settings.setMainWindowClosedHandler(
+      _onNativeWindowClosed,
+      onTrayAction: _onTrayAction,
+    );
     _boot();
   }
 
@@ -101,11 +99,52 @@ class _InboxAppState extends State<InboxApp> {
       _showingUpdate = false;
       _currentVersion = null;
     });
+    if (_isWindows) {
+      if (_vaultPath == null) {
+        _settings.hideWindow();
+      } else {
+        _restorePetWindow();
+      }
+    }
+  }
+
+  Future<void> _onTrayAction(String action) async {
+    if (!mounted || _loading || !_isWindows) return;
+    switch (action) {
+      case 'changeVault':
+        await _changeVault();
+      case 'openVault':
+        final path = _vaultPath;
+        if (path == null) {
+          await _settings.showWindow();
+        } else if (!await _settings.revealPath(path)) {
+          await _settings.showError('无法打开存储文件夹，请检查目录是否仍然存在。');
+        }
+      case 'checkUpdates':
+        await _showUpdates();
+    }
+  }
+
+  Future<void> _restorePetWindow() async {
+    await _settings.setWindowMode('floating');
+    await _settings.setWindowSize(
+      WindowSizes.pillWidth,
+      WindowSizes.pillHeight,
+      animate: false,
+    );
   }
 
   Future<void> _boot() async {
-    final path = await _settings.loadValidVaultPath();
+    // Windows 可能在启动瞬间遇到尚未就绪的 OneDrive/网络盘。不要因此
+    // 永久清除用户选择；实际写入失败会由 CaptureService 给出错误反馈。
+    final path = _isWindows
+        ? await _settings.getVaultPath()
+        : await _settings.loadValidVaultPath();
     if (!mounted) return;
+    if (_isWindows) {
+      await _settings.setWindowMode(path == null ? 'standard' : 'floating');
+      if (!mounted) return;
+    }
     setState(() {
       _vaultPath = path;
       _loading = false;
@@ -117,7 +156,13 @@ class _InboxAppState extends State<InboxApp> {
   }
 
   Future<void> _onVaultSelected(String path) async {
-    setState(() => _vaultPath = path);
+    setState(() {
+      _vaultPath = path;
+      _showingControlCenter = false;
+      _showingReader = false;
+      _showingUpdate = false;
+    });
+    if (_isWindows) await _settings.setWindowMode('floating');
     await _settings.setWindowSize(
       WindowSizes.pillWidth,
       WindowSizes.pillHeight,
@@ -125,29 +170,50 @@ class _InboxAppState extends State<InboxApp> {
   }
 
   Future<void> _changeVault() async {
-    await _settings.setWindowSize(
-      WindowSizes.onboardingWidth,
-      WindowSizes.onboardingHeight,
-    );
-    final path = await _settings.pickFolder();
-    if (!mounted) return;
-    if (path != null) {
-      await _settings.setVaultPath(path);
-      if (!mounted) return;
-      await _onVaultSelected(path);
-    } else if (_vaultPath != null) {
-      // 取消选择，回到胶囊。
+    if (_changingVault) return;
+    _changingVault = true;
+    if (_isWindows) {
+      try {
+        await _settings.showWindow();
+        final path = await _settings.pickFolder();
+        if (!mounted || path == null) return;
+        await _storage.ensureLayout(path);
+        await _settings.setVaultPath(path);
+        if (mounted) await _onVaultSelected(path);
+      } catch (error) {
+        if (mounted) await _settings.showError('无法更改存储文件夹：$error');
+      } finally {
+        _changingVault = false;
+      }
+      return;
+    }
+    try {
       await _settings.setWindowSize(
-        WindowSizes.pillWidth,
-        WindowSizes.pillHeight,
+        WindowSizes.onboardingWidth,
+        WindowSizes.onboardingHeight,
       );
+      final path = await _settings.pickFolder();
+      if (!mounted) return;
+      if (path != null) {
+        await _settings.setVaultPath(path);
+        if (!mounted) return;
+        await _onVaultSelected(path);
+      } else if (_vaultPath != null) {
+        // 取消选择，回到胶囊。
+        await _settings.setWindowSize(
+          WindowSizes.pillWidth,
+          WindowSizes.pillHeight,
+        );
+      }
+    } finally {
+      _changingVault = false;
     }
   }
 
   Future<void> _showUpdates({_UpdateOrigin origin = _UpdateOrigin.pill}) async {
     await _settings.showWindow();
     if (origin == _UpdateOrigin.pill) {
-      // 从桌宠进入：放大到更新页尺寸（仍为悬浮窗口）。
+      if (_isWindows) await _settings.setWindowMode('standard');
       await _settings.setWindowSize(
         WindowSizes.updateWidth,
         WindowSizes.updateHeight,
@@ -178,6 +244,7 @@ class _InboxAppState extends State<InboxApp> {
 
     final path = _vaultPath;
     if (path != null) {
+      if (_isWindows) await _settings.setWindowMode('floating');
       await _settings.setWindowSize(
         WindowSizes.pillWidth,
         WindowSizes.pillHeight,
@@ -196,12 +263,14 @@ class _InboxAppState extends State<InboxApp> {
   Future<void> _openControlCenter() async {
     final path = _vaultPath;
     if (path == null) return;
+    // Windows 需要先切换标题栏样式，再按客户区尺寸计算外框。
+    if (_isWindows) await _settings.setWindowMode('standard');
     await _settings.setWindowSize(
       WindowSizes.controlCenterWidth,
       WindowSizes.controlCenterHeight,
       animate: false,
     );
-    await _settings.setWindowMode('standard');
+    if (!_isWindows) await _settings.setWindowMode('standard');
     if (!mounted) return;
     setState(() => _showingControlCenter = true);
   }
@@ -220,10 +289,7 @@ class _InboxAppState extends State<InboxApp> {
   }
 
   void _openReader() {
-    _settings.setWindowSize(
-      WindowSizes.readerWidth,
-      WindowSizes.readerHeight,
-    );
+    _settings.setWindowSize(WindowSizes.readerWidth, WindowSizes.readerHeight);
     setState(() => _showingReader = true);
   }
 
@@ -233,6 +299,12 @@ class _InboxAppState extends State<InboxApp> {
       WindowSizes.controlCenterHeight,
     );
     setState(() => _showingReader = false);
+  }
+
+  @override
+  void dispose() {
+    _settings.clearDesktopEventHandlers();
+    super.dispose();
   }
 
   @override
@@ -264,10 +336,7 @@ class _InboxAppState extends State<InboxApp> {
     }
 
     if (_showingReader && _vaultPath != null) {
-      return NoteReaderView(
-        vaultPath: _vaultPath!,
-        onBack: _closeReader,
-      );
+      return NoteReaderView(vaultPath: _vaultPath!, onBack: _closeReader);
     }
 
     if (_showingControlCenter && _vaultPath != null) {

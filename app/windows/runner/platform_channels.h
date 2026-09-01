@@ -6,6 +6,9 @@
 #include <windows.h>
 
 #include <memory>
+#include <optional>
+
+#include "system_tray.h"
 
 class PlatformChannels {
  public:
@@ -14,6 +17,9 @@ class PlatformChannels {
 
   PlatformChannels(const PlatformChannels&) = delete;
   PlatformChannels& operator=(const PlatformChannels&) = delete;
+
+  std::optional<LRESULT> HandleWindowMessage(UINT message, WPARAM wparam,
+                                           LPARAM lparam);
 
  private:
   using MethodResult = flutter::MethodResult<flutter::EncodableValue>;
@@ -24,6 +30,16 @@ class PlatformChannels {
                           std::unique_ptr<MethodResult> result);
 
   HWND window_;
+  bool standard_mode_ = false;
+  bool quit_requested_ = false;
+  bool dragging_ = false;
+  POINT drag_cursor_{};
+  RECT drag_frame_{};
+  std::unique_ptr<SystemTray> tray_;
+  void ShowWindow();
+  void ResizeWindow(double width, double height);
+  void SetWindowMode(bool standard);
+  void HandleTrayAction(SystemTray::Action action);
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>
       clipboard_channel_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>>

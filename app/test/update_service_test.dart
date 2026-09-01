@@ -16,9 +16,7 @@ void main() {
 
   setUp(() async {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    baseUri = Uri.parse(
-      'http://${server.address.address}:${server.port}',
-    );
+    baseUri = Uri.parse('http://${server.address.address}:${server.port}');
     acceptHeader = null;
     userAgentHeader = null;
 
@@ -33,8 +31,10 @@ void main() {
               'tag_name': 'v1.1.1',
               'assets': [
                 {
-                  'name': AppRelease.assetName,
-                  'browser_download_url': baseUri.resolve('/download').toString(),
+                  'name': AppRelease.windowsAssetName,
+                  'browser_download_url': baseUri
+                      .resolve('/download')
+                      .toString(),
                   'digest': 'sha256:$checksum',
                   'size': 4,
                 },
@@ -59,67 +59,79 @@ void main() {
     await server.close(force: true);
   });
 
-  test('fetchLatest requests the GitHub payload and parses the release', () async {
-    final service = UpdateService(latestReleaseUri: baseUri.resolve('/latest'));
+  test(
+    'fetchLatest requests the GitHub payload and parses the release',
+    () async {
+      final service = UpdateService(
+        latestReleaseUri: baseUri.resolve('/latest'),
+        assetName: AppRelease.windowsAssetName,
+      );
 
-    final release = await service.fetchLatest();
+      final release = await service.fetchLatest();
 
-    expect(release.version, AppVersion.parse('1.1.1'));
-    expect(
-      release.downloadUrl,
-      baseUri.resolve('/download'),
-    );
-    expect(release.digest, checksum);
-    expect(acceptHeader, 'application/vnd.github+json');
-    expect(userAgentHeader, isNotEmpty);
-  });
+      expect(release.version, AppVersion.parse('1.1.1'));
+      expect(release.downloadUrl, baseUri.resolve('/download'));
+      expect(release.digest, checksum);
+      expect(acceptHeader, 'application/vnd.github+json');
+      expect(userAgentHeader, isNotEmpty);
+    },
+  );
 
-  test('download saves bytes, reports final progress, and verifies checksum', () async {
-    final directory = await Directory.systemTemp.createTemp(
-      'update_service_test_',
-    );
-    addTearDown(() => directory.delete(recursive: true));
+  test(
+    'download saves bytes, reports final progress, and verifies checksum',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'update_service_test_',
+      );
+      addTearDown(() => directory.delete(recursive: true));
 
-    final service = UpdateService(
-      latestReleaseUri: baseUri.resolve('/latest'),
-      downloadDirectory: directory,
-    );
-    final release = await service.fetchLatest();
-    final progress = <DownloadProgress>[];
+      final service = UpdateService(
+        latestReleaseUri: baseUri.resolve('/latest'),
+        downloadDirectory: directory,
+        assetName: AppRelease.windowsAssetName,
+      );
+      final release = await service.fetchLatest();
+      final progress = <DownloadProgress>[];
 
-    final file = await service.download(release, onProgress: progress.add);
+      final file = await service.download(release, onProgress: progress.add);
 
-    expect(file.parent.path, isNot(directory.path));
-    expect(file.parent.parent.path, directory.path);
-    expect(await file.readAsBytes(), const [1, 2, 3, 4]);
-    expect(progress, isNotEmpty);
-    expect(progress.last.received, 4);
-    expect(progress.last.total, 4);
-    expect(await service.verifyDigest(file, checksum), isTrue);
-  });
+      expect(file.parent.path, isNot(directory.path));
+      expect(file.parent.parent.path, directory.path);
+      expect(await file.readAsBytes(), const [1, 2, 3, 4]);
+      expect(progress, isNotEmpty);
+      expect(progress.last.received, 4);
+      expect(progress.last.total, 4);
+      expect(await service.verifyDigest(file, checksum), isTrue);
+    },
+  );
 
-  test('download deletes the partial file when checksum verification fails', () async {
-    final directory = await Directory.systemTemp.createTemp(
-      'update_service_bad_checksum_',
-    );
-    addTearDown(() => directory.delete(recursive: true));
+  test(
+    'download deletes the partial file when checksum verification fails',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'update_service_bad_checksum_',
+      );
+      addTearDown(() => directory.delete(recursive: true));
 
-    final service = UpdateService(
-      latestReleaseUri: baseUri.resolve('/latest'),
-      downloadDirectory: directory,
-    );
+      final service = UpdateService(
+        latestReleaseUri: baseUri.resolve('/latest'),
+        downloadDirectory: directory,
+        assetName: AppRelease.windowsAssetName,
+      );
 
-    await expectLater(
-      () => service.download(
-        AppRelease(
-          version: AppVersion.parse('1.1.1'),
-          downloadUrl: baseUri.resolve('/download'),
-          digest: '0000',
-          size: 4,
+      await expectLater(
+        () => service.download(
+          AppRelease(
+            version: AppVersion.parse('1.1.1'),
+            assetName: AppRelease.windowsAssetName,
+            downloadUrl: baseUri.resolve('/download'),
+            digest: '0000',
+            size: 4,
+          ),
         ),
-      ),
-      throwsA(isA<UpdateException>()),
-    );
-    expect(directory.listSync(), isEmpty);
-  });
+        throwsA(isA<UpdateException>()),
+      );
+      expect(directory.listSync(), isEmpty);
+    },
+  );
 }

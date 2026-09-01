@@ -9,6 +9,8 @@ on:
     paths:
       - 'app/**'
       - '.github/workflows/windows-build.yml'
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -92,3 +94,29 @@ jobs:
             exit 1
           }
           echo "All Windows build steps succeeded."
+
+  publish-release-asset:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download Windows build output
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build-output
+          path: windows-bundle
+
+      - name: Package portable Windows bundle
+        shell: pwsh
+        run: |
+          $version = '${{ github.event.release.tag_name }}' -replace '^v', ''
+          Compress-Archive -Path 'windows-bundle\*' -DestinationPath 'INbox-windows-x64.zip' -CompressionLevel Optimal
+          Copy-Item 'INbox-windows-x64.zip' "INbox-$version-windows-x64.zip"
+
+      - name: Attach Windows bundle to the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload '${{ github.event.release.tag_name }}' 'INbox-windows-x64.zip' 'INbox-*-windows-x64.zip' --clobber

@@ -52,6 +52,12 @@ add_subdirectory(${FLUTTER_MANAGED_DIR})
 # Application build; see runner/CMakeLists.txt.
 add_subdirectory("runner")
 
+option(INBOX_BUILD_NATIVE_TESTS "Build Win32 adapter regression tests" OFF)
+if(INBOX_BUILD_NATIVE_TESTS)
+  enable_testing()
+  add_subdirectory("tests")
+endif()
+
 
 # Generated plugin build rules, which manage building the plugins and adding
 # them to the application.
