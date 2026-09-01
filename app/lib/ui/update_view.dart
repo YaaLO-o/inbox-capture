@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/app_release.dart';
 import '../services/update_service.dart';
 
-typedef UpdateInstaller = Future<void> Function(String dmgPath);
+typedef UpdateInstaller = Future<void> Function(String packagePath);
 
 enum _UpdateState {
   checking,
@@ -53,9 +53,15 @@ class _UpdateViewState extends State<UpdateView> {
       if (!mounted) return;
       setState(() {
         _release = release;
-        _state = release.version.compareTo(widget.currentVersion) > 0
-            ? _UpdateState.available
-            : _UpdateState.current;
+        final isNewer = release.version.compareTo(widget.currentVersion) > 0;
+        if (!isNewer) {
+          _state = _UpdateState.current;
+        } else if (release.hasDownload) {
+          _state = _UpdateState.available;
+        } else {
+          _state = _UpdateState.error;
+          _errorMessage = '发现新版本 ${release.version}，但尚未提供当前系统的安装包';
+        }
       });
     } on UpdateException catch (e) {
       if (!mounted) return;
@@ -121,7 +127,7 @@ class _UpdateViewState extends State<UpdateView> {
         _operationActive = false;
       });
     }
-    // 成功路径下临时 DMG 由原生安装器（AppDelegate/UpdateInstaller）清理；
+    // 成功路径下临时安装包由原生安装器清理；
     // 安装成功后 App 会终止，不需要 Dart 侧再删除。
   }
 

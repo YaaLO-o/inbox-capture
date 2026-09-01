@@ -135,7 +135,11 @@ class _InboxAppState extends State<InboxApp> {
   }
 
   Future<void> _boot() async {
-    final path = await _settings.loadValidVaultPath();
+    // Windows 可能在启动瞬间遇到尚未就绪的 OneDrive/网络盘。不要因此
+    // 永久清除用户选择；实际写入失败会由 CaptureService 给出错误反馈。
+    final path = _isWindows
+        ? await _settings.getVaultPath()
+        : await _settings.loadValidVaultPath();
     if (!mounted) return;
     if (_isWindows) {
       await _settings.setWindowMode(path == null ? 'standard' : 'floating');
@@ -207,19 +211,9 @@ class _InboxAppState extends State<InboxApp> {
   }
 
   Future<void> _showUpdates({_UpdateOrigin origin = _UpdateOrigin.pill}) async {
-    // 当前下载与安装协议只支持 macOS DMG。Windows 仅在用户主动请求时
-    // 打开发布页，不检查/下载错误平台的安装包。
-    if (_isWindows) {
-      if (!await _settings.openExternalUrl(
-        'https://github.com/YaaLO-o/inbox-capture/releases',
-      )) {
-        await _settings.showError('无法打开发布页面，请检查默认浏览器设置。');
-      }
-      return;
-    }
     await _settings.showWindow();
     if (origin == _UpdateOrigin.pill) {
-      // 从桌宠进入：放大到更新页尺寸（仍为悬浮窗口）。
+      if (_isWindows) await _settings.setWindowMode('standard');
       await _settings.setWindowSize(
         WindowSizes.updateWidth,
         WindowSizes.updateHeight,
@@ -250,6 +244,7 @@ class _InboxAppState extends State<InboxApp> {
 
     final path = _vaultPath;
     if (path != null) {
+      if (_isWindows) await _settings.setWindowMode('floating');
       await _settings.setWindowSize(
         WindowSizes.pillWidth,
         WindowSizes.pillHeight,

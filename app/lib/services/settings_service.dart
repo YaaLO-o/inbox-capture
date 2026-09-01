@@ -113,8 +113,11 @@ class SettingsService {
 
   Future<void> endWindowDrag() => _channel.invokeMethod('endWindowDrag');
 
-  Future<void> installUpdate(String dmgPath) =>
-      _channel.invokeMethod('installUpdate', {'dmgPath': dmgPath});
+  Future<void> installUpdate(String packagePath) => _channel.invokeMethod(
+    'installUpdate',
+    // dmgPath 保持 macOS 原生边界兼容；path 是新的跨平台参数。
+    {'path': packagePath, 'dmgPath': packagePath},
+  );
 
   /// 退出应用。
   Future<void> quit() => _channel.invokeMethod('quit');

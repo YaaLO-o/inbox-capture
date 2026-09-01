@@ -94,3 +94,18 @@ capture, pet dragging, rapid clicks and tray menu items still needs a short
 human pass. Those paths are covered separately by the shared Dart suite and the
 native clipboard/window regression target. AppKit compilation and live macOS
 interaction remain Mac-only checks; all shared Dart/macOS behavior tests pass.
+
+## Manual follow-up fixes
+
+The first Windows manual pass found two issues. Windows startup now trusts the
+persisted Vault path instead of deleting it when a cloud or network directory
+is briefly unavailable. A missing directory therefore produces a capture error
+and remains changeable from the tray, rather than forcing onboarding again.
+
+Windows update checks now stay inside INbox. The shared updater selects
+`INbox-windows-x64.zip`, compares versions, downloads with progress, verifies
+the GitHub SHA-256 digest, exits, replaces the portable bundle and restarts the
+app. A release with no Windows package is reported in the update view. The
+Windows GitHub Actions workflow attaches that ZIP to future published releases.
+An isolated end-to-end fixture verified ZIP extraction, bundle replacement and
+automatic restart without touching the user's Vault or installed app.

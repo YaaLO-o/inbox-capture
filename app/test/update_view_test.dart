@@ -13,6 +13,7 @@ void main() {
 
   AppRelease release(String version) => AppRelease(
     version: AppVersion.parse(version),
+    assetName: AppRelease.macOSAssetName,
     downloadUrl: Uri.parse('https://example.com/INbox.dmg'),
     digest: 'digest',
     size: 100,
@@ -136,6 +137,20 @@ void main() {
     expect(find.text('当前已是最新版本'), findsOneWidget);
   });
 
+  testWidgets(
+    'shows an in-app message when a newer platform package is absent',
+    (tester) async {
+      final service = FakeUpdateService();
+
+      await pumpUpdateView(tester, service: service);
+      service.completeFetch(AppRelease(version: AppVersion.parse('1.1.2')));
+      await tester.pump();
+
+      expect(find.textContaining('尚未提供当前系统的安装包'), findsOneWidget);
+      expect(find.text('下载并安装'), findsNothing);
+    },
+  );
+
   testWidgets('shows checksum failure and keeps close available', (
     tester,
   ) async {
@@ -148,9 +163,7 @@ void main() {
 
     await tester.tap(find.text('下载并安装'));
     await tester.pump();
-    service.failDownload(
-      const UpdateException('下载文件校验失败，可能已损坏'),
-    );
+    service.failDownload(const UpdateException('下载文件校验失败，可能已损坏'));
     await tester.pump();
 
     expect(find.text('下载文件校验失败，可能已损坏'), findsOneWidget);

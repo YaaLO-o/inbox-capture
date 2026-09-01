@@ -113,7 +113,26 @@ class ClipboardSnapshot {
   std::map<UINT, std::vector<uint8_t>> saved_;
 };
 
-int main() {
+int RunUpdaterHarness(const std::string& archive) {
+  CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+  Win32Window window;
+  if (!window.Create(L"INbox updater harness", {100, 100}, {420, 300})) {
+    CoUninitialize();
+    return 2;
+  }
+  Messenger messenger;
+  PlatformChannels channels(&messenger, window.GetHandle());
+  const auto response = messenger.Call(
+      kSettings, "installUpdate", Map{{Value("path"), Value(archive)}});
+  CoUninitialize();
+  return response.success ? 0 : 3;
+}
+
+int main(int argc, char** argv) {
+  if (argc == 3 && std::string(argv[1]) == "--exercise-updater") {
+    return RunUpdaterHarness(argv[2]);
+  }
   CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
   SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
   {

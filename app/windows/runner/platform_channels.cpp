@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <cwchar>
 #include <limits>
+#include <sstream>
 #include <optional>
 #include <string>
 #include <utility>
@@ -403,6 +404,154 @@ bool ShellOpen(const wchar_t* action, const std::wstring& target) {
   return reinterpret_cast<INT_PTR>(result) > 32;
 }
 
+std::wstring PowerShellLiteral(const std::wstring& value) {
+  std::wstring escaped;
+  escaped.reserve(value.size() + 2);
+  escaped.push_back(L'\'');
+  for (const wchar_t character : value) {
+    escaped.push_back(character);
+    if (character == L'\'') {
+      escaped.push_back(L'\'');
+    }
+  }
+  escaped.push_back(L'\'');
+  return escaped;
+}
+
+std::optional<std::wstring> ExecutablePath() {
+  std::vector<wchar_t> buffer(32768, L'\0');
+  const DWORD length = GetModuleFileNameW(
+      nullptr, buffer.data(), static_cast<DWORD>(buffer.size()));
+  if (length == 0 || length >= buffer.size()) {
+    return std::nullopt;
+  }
+  return std::wstring(buffer.data(), length);
+}
+
+bool WriteUtf8Script(const std::wstring& path, const std::wstring& contents) {
+  const std::string utf8 = Utf8FromUtf16(contents.c_str(), contents.size());
+  if (utf8.empty() ||
+      utf8.size() > static_cast<size_t>(std::numeric_limits<DWORD>::max())) {
+    return false;
+  }
+  HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr,
+                            CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (file == INVALID_HANDLE_VALUE) {
+    return false;
+  }
+  constexpr uint8_t bom[] = {0xEF, 0xBB, 0xBF};
+  DWORD written = 0;
+  const bool success =
+      WriteFile(file, bom, sizeof(bom), &written, nullptr) &&
+      written == sizeof(bom) &&
+      WriteFile(file, utf8.data(), static_cast<DWORD>(utf8.size()), &written,
+                nullptr) &&
+      written == utf8.size();
+  CloseHandle(file);
+  return success;
+}
+
+bool StartWindowsUpdate(const std::string& package_path,
+                        std::string* error_message) {
+  const std::wstring archive = WideFromUtf8(package_path);
+  const DWORD attributes = GetFileAttributesW(archive.c_str());
+  if (archive.empty() || attributes == INVALID_FILE_ATTRIBUTES ||
+      (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+    *error_message = "下载的 Windows 更新包不存在";
+    return false;
+  }
+  std::wstring lower_archive = archive;
+  CharLowerBuffW(lower_archive.data(), static_cast<DWORD>(lower_archive.size()));
+  if (lower_archive.size() < 4 ||
+      lower_archive.substr(lower_archive.size() - 4) != L".zip") {
+    *error_message = "Windows 更新包必须是 ZIP 文件";
+    return false;
+  }
+
+  const auto executable = ExecutablePath();
+  if (!executable) {
+    *error_message = "无法定位当前 INbox 安装目录";
+    return false;
+  }
+  const size_t executable_separator = executable->find_last_of(L"\\/");
+  const size_t archive_separator = archive.find_last_of(L"\\/");
+  if (executable_separator == std::wstring::npos ||
+      archive_separator == std::wstring::npos) {
+    *error_message = "更新路径无效";
+    return false;
+  }
+  const std::wstring install_directory =
+      executable->substr(0, executable_separator);
+  const std::wstring update_directory = archive.substr(0, archive_separator);
+
+  const std::wstring probe = install_directory + L"\\.inbox-update-write-test";
+  HANDLE probe_file = CreateFileW(
+      probe.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+      FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_TEMPORARY, nullptr);
+  if (probe_file == INVALID_HANDLE_VALUE) {
+    *error_message = "当前安装目录不可写，无法自动更新";
+    return false;
+  }
+  CloseHandle(probe_file);
+  DeleteFileW(probe.c_str());
+
+  const std::wstring script_path =
+      update_directory + L"\\install-windows-update.ps1";
+  const std::wstring staging = update_directory + L"\\staging";
+  const std::wstring log_path = update_directory + L"\\update-error.log";
+  std::wostringstream script;
+  script << L"$ErrorActionPreference = 'Stop'\r\n"
+         << L"$archive = " << PowerShellLiteral(archive) << L"\r\n"
+         << L"$install = " << PowerShellLiteral(install_directory) << L"\r\n"
+         << L"$staging = " << PowerShellLiteral(staging) << L"\r\n"
+         << L"$log = " << PowerShellLiteral(log_path) << L"\r\n"
+         << L"try {\r\n"
+         << L"  Wait-Process -Id " << GetCurrentProcessId()
+         << L" -ErrorAction SilentlyContinue\r\n"
+         << L"  if (Test-Path -LiteralPath $staging) { Remove-Item -LiteralPath $staging -Recurse -Force }\r\n"
+         << L"  Expand-Archive -LiteralPath $archive -DestinationPath $staging -Force\r\n"
+         << L"  $source = $staging\r\n"
+         << L"  if (-not (Test-Path -LiteralPath (Join-Path $source 'inbox_app.exe'))) {\r\n"
+         << L"    $directories = @(Get-ChildItem -LiteralPath $staging -Directory -Force)\r\n"
+         << L"    if ($directories.Count -eq 1 -and (Test-Path -LiteralPath (Join-Path $directories[0].FullName 'inbox_app.exe'))) { $source = $directories[0].FullName }\r\n"
+         << L"  }\r\n"
+         << L"  $newExe = Join-Path $source 'inbox_app.exe'\r\n"
+         << L"  if (-not (Test-Path -LiteralPath $newExe)) { throw '更新包中缺少 inbox_app.exe' }\r\n"
+         << L"  Get-ChildItem -LiteralPath $source -Force | Copy-Item -Destination $install -Recurse -Force\r\n"
+         << L"  Remove-Item -LiteralPath $archive -Force\r\n"
+         << L"  Remove-Item -LiteralPath $staging -Recurse -Force\r\n"
+         << L"  Start-Process -FilePath (Join-Path $install 'inbox_app.exe')\r\n"
+         << L"} catch { $_ | Out-String | Set-Content -LiteralPath $log -Encoding UTF8 }\r\n";
+  if (!WriteUtf8Script(script_path, script.str())) {
+    *error_message = "无法准备 Windows 更新程序";
+    return false;
+  }
+
+  wchar_t system_directory[MAX_PATH]{};
+  if (GetSystemDirectoryW(system_directory, MAX_PATH) == 0) {
+    *error_message = "无法定位 PowerShell";
+    return false;
+  }
+  const std::wstring powershell =
+      std::wstring(system_directory) +
+      L"\\WindowsPowerShell\\v1.0\\powershell.exe";
+  std::wstring command = L"\"" + powershell +
+                         L"\" -NoProfile -NonInteractive "
+                         L"-ExecutionPolicy Bypass -File \"" +
+                         script_path + L"\"";
+  STARTUPINFOW startup{sizeof(startup)};
+  PROCESS_INFORMATION process{};
+  if (!CreateProcessW(powershell.c_str(), command.data(), nullptr, nullptr,
+                      FALSE, CREATE_NO_WINDOW | CREATE_UNICODE_ENVIRONMENT,
+                      nullptr, nullptr, &startup, &process)) {
+    *error_message = "无法启动 Windows 更新程序";
+    return false;
+  }
+  CloseHandle(process.hThread);
+  CloseHandle(process.hProcess);
+  return true;
+}
+
 std::optional<std::string> PickFolder(HWND window) {
   IFileOpenDialog* dialog = nullptr;
   if (CoCreateInstance(CLSID_FileOpenDialog, nullptr, CLSCTX_INPROC_SERVER,
@@ -676,6 +825,26 @@ void PlatformChannels::HandleSettingsCall(
     MessageBoxW(window_, WideFromUtf8(*message).c_str(), L"INbox",
                 MB_OK | MB_ICONERROR);
     result->Success();
+    return;
+  }
+  if (method == "installUpdate") {
+    const auto* args = ArgumentsMap(call);
+    const auto* value = Argument(args, "path");
+    if (value == nullptr) {
+      value = Argument(args, "dmgPath");
+    }
+    const auto* path =
+        value == nullptr ? nullptr : std::get_if<std::string>(value);
+    std::string error_message;
+    if (path == nullptr || !StartWindowsUpdate(*path, &error_message)) {
+      result->Error("UPDATE_PREPARE_FAILED",
+                    error_message.empty() ? "Windows 更新参数无效"
+                                          : error_message);
+      return;
+    }
+    result->Success();
+    quit_requested_ = true;
+    PostMessage(window_, WM_CLOSE, 0, 0);
     return;
   }
   if (method == "quit") {

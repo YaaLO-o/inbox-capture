@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inbox_app/main.dart';
+import 'package:inbox_app/models/app_release.dart';
+import 'package:inbox_app/services/update_service.dart';
 import 'package:inbox_app/ui/capture_pill.dart';
 import 'package:inbox_app/ui/control_center_view.dart';
 import 'package:inbox_app/ui/onboarding_view.dart';
@@ -98,6 +100,20 @@ void main() {
     },
   );
 
+  windowsTest(
+    'Windows keeps a persisted Vault even when it is briefly offline',
+    (tester) async {
+      savedPath = r'Z:\temporarily-offline-vault';
+      await tester.pumpWidget(const InboxApp());
+      await settle(tester);
+
+      expect(find.byType(CapturePill), findsOneWidget);
+      expect(calls.where((c) => c.method == 'clearVaultPath'), isEmpty);
+      expect(calls.where((c) => c.method == 'pickFolder'), isEmpty);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+
   windowsTest('first launch uses a standard onboarding window', (tester) async {
     savedPath = null;
     await tester.pumpWidget(const InboxApp());
@@ -174,23 +190,23 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  windowsTest(
-    'Windows update entry opens releases without running the DMG updater',
-    (tester) async {
-      await tester.pumpWidget(const InboxApp());
-      await settle(tester);
-      tester.widget<CapturePill>(find.byType(CapturePill)).onCheckUpdates();
-      await settle(tester);
-      expect(
-        calls.where((c) => c.method == 'openExternalUrl').single.arguments,
-        {'url': 'https://github.com/YaaLO-o/inbox-capture/releases'},
-      );
-      expect(calls.where((c) => c.method == 'installUpdate'), isEmpty);
-      expect(find.byType(UpdateView), findsNothing);
-      expect(find.byType(CapturePill), findsOneWidget);
-      await tester.pumpWidget(const SizedBox());
-    },
-  );
+  windowsTest('Windows update entry checks and reports status inside the app', (
+    tester,
+  ) async {
+    final updates = ShellUpdateService();
+    await tester.pumpWidget(InboxApp(updateService: updates));
+    await settle(tester);
+    tester.widget<CapturePill>(find.byType(CapturePill)).onCheckUpdates();
+    await tester.pumpAndSettle();
+    expect(find.byType(UpdateView), findsOneWidget);
+    expect(find.text('正在检查更新…'), findsOneWidget);
+    expect(calls.where((c) => c.method == 'openExternalUrl'), isEmpty);
+
+      updates.complete(AppRelease(version: AppVersion.parse('1.2.0')));
+      await tester.pumpAndSettle();
+    expect(find.text('当前已是最新版本'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
 
   windowsTest('standard close restores pet state after a tray event', (
     tester,
@@ -216,4 +232,13 @@ void main() {
     expect(find.byType(CapturePill), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
+}
+
+class ShellUpdateService extends UpdateService {
+  final Completer<AppRelease> _latest = Completer<AppRelease>();
+
+  @override
+  Future<AppRelease> fetchLatest() => _latest.future;
+
+  void complete(AppRelease release) => _latest.complete(release);
 }
