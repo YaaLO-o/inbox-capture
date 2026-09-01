@@ -110,10 +110,13 @@ jobs:
 
       - name: Package portable Windows bundle
         shell: pwsh
-        run: Compress-Archive -Path 'windows-bundle\*' -DestinationPath 'INbox-windows-x64.zip' -CompressionLevel Optimal
+        run: |
+          $version = '${{ github.event.release.tag_name }}' -replace '^v', ''
+          Compress-Archive -Path 'windows-bundle\*' -DestinationPath 'INbox-windows-x64.zip' -CompressionLevel Optimal
+          Copy-Item 'INbox-windows-x64.zip' "INbox-$version-windows-x64.zip"
 
       - name: Attach Windows bundle to the release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload '${{ github.event.release.tag_name }}' 'INbox-windows-x64.zip' --clobber
+        run: gh release upload '${{ github.event.release.tag_name }}' 'INbox-windows-x64.zip' 'INbox-*-windows-x64.zip' --clobber
