@@ -130,7 +130,7 @@ void main() {
     });
   });
 
-  testWidgets('Windows 拖动继续使用 moveWindowBy 回退', (tester) async {
+  testWidgets('Windows 拖动使用原生绝对坐标会话', (tester) async {
     await withTestPlatform(TargetPlatform.windows, () async {
       final calls = <MethodCall>[];
       messenger.setMockMethodCallHandler(settingsChannel, (call) async {
@@ -148,8 +148,11 @@ void main() {
       );
       await tester.pump();
 
-      expect(calls, isNotEmpty);
-      expect(calls.every((call) => call.method == 'moveWindowBy'), isTrue);
+      expect(calls.map((call) => call.method), [
+        'beginWindowDrag',
+        'updateWindowDrag',
+        'endWindowDrag',
+      ]);
       expect(capture.calls, 0);
     });
   });
@@ -315,10 +318,7 @@ void main() {
     expect(find.text('更改存储文件夹'), findsOneWidget);
 
     // 第二次右键：关闭
-    gesture = await tester.startGesture(
-      center,
-      buttons: kSecondaryMouseButton,
-    );
+    gesture = await tester.startGesture(center, buttons: kSecondaryMouseButton);
     await gesture.up();
     await tester.pumpAndSettle();
     expect(find.text('更改存储文件夹'), findsNothing);

@@ -6,6 +6,7 @@
 #include <windows.h>
 
 #include <iostream>
+#include <limits>
 
 void CreateAndAttachConsole() {
   if (::AllocConsole()) {
@@ -42,12 +43,14 @@ std::vector<std::string> GetCommandLineArguments() {
 }
 
 std::string Utf8FromUtf16(const wchar_t* utf16_string) {
-  if (utf16_string == nullptr) {
+  return utf16_string ? Utf8FromUtf16(utf16_string, wcslen(utf16_string)) : std::string();
+}
+
+std::string Utf8FromUtf16(const wchar_t* utf16_string, size_t length) {
+  if (utf16_string == nullptr || length > static_cast<size_t>(std::numeric_limits<int>::max())) {
     return std::string();
   }
-  // First, find the length of the string with a safe upper bound (CWE-126).
-  // UNICODE_STRING_MAX_CHARS (32767) is the maximum length of a UNICODE_STRING.
-  int input_length = static_cast<int>(wcsnlen(utf16_string, UNICODE_STRING_MAX_CHARS));
+  const int input_length = static_cast<int>(length);
   // Now use that bounded length to determine the required buffer size.
   // When an explicit length is passed, WideCharToMultiByte does not include
   // the null terminator in its returned size.

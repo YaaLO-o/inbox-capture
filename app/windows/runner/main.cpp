@@ -29,9 +29,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   RECT work_area{};
   ::SystemParametersInfo(SPI_GETWORKAREA, 0, &work_area, 0);
+  const double scale = static_cast<double>(GetDpiForSystem()) / 96.0;
   Win32Window::Point origin(
-      static_cast<unsigned int>(std::max<LONG>(10, work_area.right - 156)),
-      static_cast<unsigned int>(std::max<LONG>(10, work_area.top + 24)));
+      std::max<LONG>(10, work_area.right - static_cast<LONG>(156 * scale)),
+      std::max<LONG>(10, work_area.top + static_cast<LONG>(24 * scale)));
   Win32Window::Size size(132, 132);
   if (!window.Create(L"inbox_app", origin, size)) {
     return EXIT_FAILURE;

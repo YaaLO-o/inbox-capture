@@ -609,7 +609,7 @@ void main() {
     final sources =
         <({String name, String extension, String displayName, bool isImage})>[
           (
-            name: '合同]|终版.pdf',
+            name: '合同]终版.pdf',
             extension: 'pdf',
             displayName: '合同终版.pdf',
             isImage: false,
@@ -694,8 +694,10 @@ void main() {
       final md = readInbox(tmp.path, now);
       // 显示名经 _safeDisplayName 清洗：去掉 #|^:%[]() 等会破坏 Markdown
       // 链接结构的字符。这里同步清洗以匹配实际写入内容。
-      final expectedLabel = source.displayName
-          .replaceAll(RegExp(r'[#|^:%\[\]()]'), '');
+      final expectedLabel = source.displayName.replaceAll(
+        RegExp(r'[#|^:%\[\]()]'),
+        '',
+      );
       final entry = source.isImage
           ? '![](attachments/$fileName)'
           : '[$expectedLabel](attachments/$fileName)';
@@ -719,14 +721,25 @@ void main() {
 
   test('危险扩展名和换行显示名不会破坏 Markdown 链接或 Capture 边界', () async {
     final now = DateTime(2026, 8, 21, 18, 5, 30);
-    final src = File('${tmp.path}/报告\n---\n终版.bad#draft')
-      ..writeAsBytesSync([1, 2, 3]);
+    final src = File('${tmp.path}/source.bin')..writeAsBytesSync([1, 2, 3]);
     final svc = CaptureService(
       clipboard: FakeClipboard(ClipboardContent(files: [src.path])),
       storage: storage,
     );
 
-    final result = await svc.captureNow(tmp.path, now: now);
+    final result = await svc.captureInput(
+      tmp.path,
+      CaptureInput(
+        attachments: [
+          CaptureAttachmentInput(
+            source: FileAttachmentSource(src.path),
+            extension: 'bad#draft',
+            displayName: '报告\n---\n终版.bad#draft',
+          ),
+        ],
+      ),
+      now: now,
+    );
 
     expect(result.isSaved, isTrue);
     final storedName = result.captureId!;
