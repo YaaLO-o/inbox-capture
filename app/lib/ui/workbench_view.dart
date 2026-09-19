@@ -41,6 +41,7 @@ class WorkbenchView extends StatefulWidget {
 }
 
 class _WorkbenchViewState extends State<WorkbenchView> {
+  late String _vaultPath;
   late List<File> _files;
   File? _selected;
   bool _showSettings = false;
@@ -48,8 +49,28 @@ class _WorkbenchViewState extends State<WorkbenchView> {
   @override
   void initState() {
     super.initState();
-    _files = _listFiles(widget.vaultPath);
+    _vaultPath = widget.vaultPath;
+    _files = _listFiles(_vaultPath);
     _selected = _files.isEmpty ? null : _files.first;
+  }
+
+  @override
+  void didUpdateWidget(WorkbenchView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.vaultPath != _vaultPath) {
+      _vaultPath = widget.vaultPath;
+      _files = _listFiles(_vaultPath);
+      _selected = _files.isEmpty ? null : _files.first;
+    }
+  }
+
+  void _handleVaultPathChanged(String path) {
+    setState(() {
+      _vaultPath = path;
+      _files = _listFiles(path);
+      _selected = _files.isEmpty ? null : _files.first;
+    });
+    widget.onVaultPathChanged(path);
   }
 
   List<File> _listFiles(String vaultPath) {
@@ -275,12 +296,12 @@ class _WorkbenchViewState extends State<WorkbenchView> {
         ),
         Expanded(
           child: _showSettings
-              ? ControlCenterView(
-                  vaultPath: widget.vaultPath,
+              ? ControlCenterPanel(
+                  vaultPath: _vaultPath,
                   settings: widget.settings,
                   storage: widget.storage,
                   display: widget.display,
-                  onVaultPathChanged: widget.onVaultPathChanged,
+                  onVaultPathChanged: _handleVaultPathChanged,
                   onCheckUpdates: widget.onCheckUpdates,
                   onOpenContent: () => setState(() => _showSettings = false),
                   onClose: widget.onClose,

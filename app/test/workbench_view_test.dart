@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inbox_app/services/desktop_file_vault_storage.dart';
 import 'package:inbox_app/services/display_service.dart';
@@ -11,9 +12,34 @@ import 'package:inbox_app/util/path_utils.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory tmp;
+  String? pickedPath;
+  String? changedPath;
+  final messenger =
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  const channel = MethodChannel('com.inbox.app/settings');
 
-  setUp(() => tmp = Directory.systemTemp.createTempSync('workbench_view_'));
-  tearDown(() => tmp.deleteSync(recursive: true));
+  setUp(() {
+    tmp = Directory.systemTemp.createTempSync('workbench_view_');
+    pickedPath = null;
+    changedPath = null;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      switch (call.method) {
+        case 'getDisplayMethod':
+          return 'inbox';
+        case 'getAppVersion':
+          return '1.2.0';
+        case 'pickFolder':
+          return pickedPath;
+        case 'revealPath':
+          return true;
+      }
+      return null;
+    });
+  });
+  tearDown(() {
+    messenger.setMockMethodCallHandler(channel, null);
+    tmp.deleteSync(recursive: true);
+  });
 
   File writeNote(String date, String content) =>
       File(VaultPaths.dailyInboxFile(tmp.path, DateTime.parse(date)))
@@ -29,7 +55,7 @@ void main() {
       display: DisplayService(settings: settings),
       onCheckUpdates: () {},
       onClose: () {},
-      onVaultPathChanged: (_) {},
+      onVaultPathChanged: (path) => changedPath = path,
     );
   }
 
@@ -74,5 +100,52 @@ void main() {
     await tester.tap(find.text('2026-08-26').first);
     await tester.pumpAndSettle();
     expect(find.textContaining('无法读取该文件'), findsOneWidget);
+  });
+
+  testWidgets(
+    'settings replaces only the right pane and View Content returns to the selected note',
+    (tester) async {
+      writeNote('2026-08-26', 'selected note body');
+      await tester.pumpWidget(workbench());
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('设置'));
+      await tester.pumpAndSettle();
+      expect(find.byType(MaterialApp), findsOneWidget);
+      expect(find.textContaining(tmp.path), findsOneWidget);
+      expect(find.text('更改存储文件夹'), findsOneWidget);
+      expect(find.text('应用内查看'), findsOneWidget);
+      expect(find.text('检查更新'), findsOneWidget);
+      expect(find.text('2026-08-26'), findsOneWidget);
+
+      await tester.tap(find.text('查看内容'));
+      await tester.pumpAndSettle();
+      expect(find.text('selected note body'), findsOneWidget);
+    },
+  );
+
+  testWidgets('changing Vault refreshes sidebar and chooses its newest note', (
+    tester,
+  ) async {
+    writeNote('2026-08-26', 'old vault body');
+    final next = Directory('${tmp.path}/next')..createSync();
+    File(VaultPaths.dailyInboxFile(next.path, DateTime(2026, 9, 1)))
+      ..createSync(recursive: true)
+      ..writeAsStringSync('new vault body');
+    pickedPath = next.path;
+
+    await tester.pumpWidget(workbench());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('设置'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('更改存储文件夹'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('查看内容'));
+    await tester.pumpAndSettle();
+
+    expect(changedPath, next.path);
+    expect(find.text('2026-09-01'), findsWidgets);
+    expect(find.text('new vault body'), findsOneWidget);
+    expect(find.text('old vault body'), findsNothing);
   });
 }
