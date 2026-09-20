@@ -42,12 +42,14 @@ class _WorkbenchSidebarState extends State<WorkbenchSidebar> {
           }
         }
 
-        final content = WorkbenchSidebarScope(
+        Widget withScope(Widget child) => WorkbenchSidebarScope(
           open: _open,
           narrow: narrow,
           toggle: _toggle,
-          child: widget.child,
+          child: child,
         );
+        final content = withScope(widget.child);
+        final sidebar = withScope(widget.sidebar);
 
         if (narrow) {
           return Stack(
@@ -66,7 +68,7 @@ class _WorkbenchSidebarState extends State<WorkbenchSidebar> {
                   child: SizedBox(
                     width: widget.sidebarWidth,
                     height: double.infinity,
-                    child: widget.sidebar,
+                    child: sidebar,
                   ),
                 ),
               ],
@@ -78,7 +80,7 @@ class _WorkbenchSidebarState extends State<WorkbenchSidebar> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (_open) ...[
-              SizedBox(width: widget.sidebarWidth, child: widget.sidebar),
+              SizedBox(width: widget.sidebarWidth, child: sidebar),
               const VerticalDivider(width: 1),
             ],
             Expanded(child: content),
@@ -104,7 +106,8 @@ class WorkbenchSidebarScope extends InheritedWidget {
   });
 
   static WorkbenchSidebarScope of(BuildContext context) {
-    final scope = context.dependOnInheritedWidgetOfExactType<WorkbenchSidebarScope>();
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<WorkbenchSidebarScope>();
     assert(scope != null, 'WorkbenchSidebarScope is missing');
     return scope!;
   }

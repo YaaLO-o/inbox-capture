@@ -148,4 +148,22 @@ void main() {
     expect(find.text('new vault body'), findsOneWidget);
     expect(find.text('old vault body'), findsNothing);
   });
+
+  testWidgets('narrow sidebar closes after choosing settings', (tester) async {
+    tester.view.physicalSize = const Size(500, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(workbench());
+    await tester.pumpAndSettle();
+    expect(find.text('设置'), findsNothing);
+    await tester.tap(find.byKey(const Key('sidebar-toggle')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('设置'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('sidebar-scrim')), findsNothing);
+    expect(find.text('更改存储文件夹'), findsOneWidget);
+  });
 }

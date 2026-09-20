@@ -9,7 +9,7 @@ import 'package:inbox_app/main.dart';
 import 'package:inbox_app/models/app_release.dart';
 import 'package:inbox_app/services/update_service.dart';
 import 'package:inbox_app/ui/capture_pill.dart';
-import 'package:inbox_app/ui/control_center_view.dart';
+import 'package:inbox_app/ui/workbench_view.dart';
 import 'package:inbox_app/ui/onboarding_view.dart';
 import 'package:inbox_app/ui/update_view.dart';
 
@@ -202,8 +202,8 @@ void main() {
     expect(find.text('正在检查更新…'), findsOneWidget);
     expect(calls.where((c) => c.method == 'openExternalUrl'), isEmpty);
 
-      updates.complete(AppRelease(version: AppVersion.parse('1.2.0')));
-      await tester.pumpAndSettle();
+    updates.complete(AppRelease(version: AppVersion.parse('1.2.0')));
+    await tester.pumpAndSettle();
     expect(find.text('当前已是最新版本'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
@@ -216,22 +216,68 @@ void main() {
     await nativeEvent('trayAction', 'openVault');
     tester.widget<CapturePill>(find.byType(CapturePill)).onOpenControlCenter();
     await settle(tester);
-    expect(find.byType(ControlCenterView), findsOneWidget);
+    expect(find.byType(WorkbenchView), findsOneWidget);
     final standardMode = calls.lastIndexWhere(
       (call) =>
           call.method == 'setWindowMode' &&
           call.arguments['mode'] == 'standard',
     );
-    final controlCenterSize = calls.lastIndexWhere(
+    final workbenchSize = calls.lastIndexWhere(
       (call) =>
-          call.method == 'setWindowSize' && call.arguments['width'] == 480.0,
+          call.method == 'setWindowSize' && call.arguments['width'] == 860.0,
     );
-    expect(standardMode, lessThan(controlCenterSize));
+    expect(standardMode, lessThan(workbenchSize));
     await nativeEvent('mainWindowDidClose');
     await settle(tester);
     expect(find.byType(CapturePill), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
+
+  windowsTest(
+    'workbench keeps one window through settings and update, then returns to pet',
+    (tester) async {
+      final updates = ShellUpdateService();
+      await tester.pumpWidget(InboxApp(updateService: updates));
+      await settle(tester);
+      tester
+          .widget<CapturePill>(find.byType(CapturePill))
+          .onOpenControlCenter();
+      await settle(tester);
+      expect(find.byType(WorkbenchView), findsOneWidget);
+      expect(
+        calls.where((c) => c.method == 'setWindowSize').last.arguments['width'],
+        860.0,
+      );
+
+      await tester.tap(find.text('设置'));
+      await settle(tester);
+      await tester.tap(find.text('查看内容'));
+      await settle(tester);
+      expect(find.byType(WorkbenchView), findsOneWidget);
+      expect(
+        calls.where(
+          (c) => c.method == 'setWindowSize' && c.arguments['width'] == 640.0,
+        ),
+        isEmpty,
+      );
+
+      await tester.tap(find.text('设置'));
+      await settle(tester);
+      await tester.tap(find.text('检查更新'));
+      await settle(tester);
+      expect(find.byType(UpdateView), findsOneWidget);
+      updates.complete(AppRelease(version: AppVersion.parse('1.2.0')));
+      await settle(tester);
+      tester.widget<UpdateView>(find.byType(UpdateView)).onClose();
+      await settle(tester);
+      expect(find.byType(WorkbenchView), findsOneWidget);
+
+      await tester.tap(find.text('返回桌宠'));
+      await settle(tester);
+      expect(find.byType(CapturePill), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
 }
 
 class ShellUpdateService extends UpdateService {

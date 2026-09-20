@@ -91,7 +91,12 @@ class _WorkbenchViewState extends State<WorkbenchView> {
     return name.endsWith('.md') ? name.substring(0, name.length - 3) : name;
   }
 
-  Widget _buildSidebar() {
+  void _closeNarrowSidebar(BuildContext context) {
+    final scope = WorkbenchSidebarScope.of(context);
+    if (scope.narrow && scope.open) scope.toggle();
+  }
+
+  Widget _buildSidebar(BuildContext context) {
     return Material(
       color: _sidebar,
       child: Column(
@@ -142,10 +147,13 @@ class _WorkbenchViewState extends State<WorkbenchView> {
                           borderRadius: BorderRadius.circular(9),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(9),
-                            onTap: () => setState(() {
-                              _selected = file;
-                              _showSettings = false;
-                            }),
+                            onTap: () {
+                              setState(() {
+                                _selected = file;
+                                _showSettings = false;
+                              });
+                              _closeNarrowSidebar(context);
+                            },
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
@@ -191,7 +199,10 @@ class _WorkbenchViewState extends State<WorkbenchView> {
                   selectedTileColor: const Color(0xFF2D4440),
                   leading: const Icon(Icons.settings_outlined, size: 19),
                   title: const Text('设置'),
-                  onTap: () => setState(() => _showSettings = true),
+                  onTap: () {
+                    setState(() => _showSettings = true);
+                    _closeNarrowSidebar(context);
+                  },
                 ),
                 ListTile(
                   dense: true,
@@ -334,7 +345,7 @@ class _WorkbenchViewState extends State<WorkbenchView> {
                 border: Border.all(color: _border),
               ),
               child: WorkbenchSidebar(
-                sidebar: _buildSidebar(),
+                sidebar: Builder(builder: _buildSidebar),
                 child: Builder(builder: _buildMain),
               ),
             ),

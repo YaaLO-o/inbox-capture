@@ -14,11 +14,10 @@ import 'services/update_service.dart';
 import 'services/vault_storage.dart';
 import 'ui/android_settings_view.dart';
 import 'ui/capture_pill.dart';
-import 'ui/control_center_view.dart';
-import 'ui/note_reader_view.dart';
 import 'ui/onboarding_view.dart';
 import 'ui/update_view.dart';
 import 'ui/window_sizes.dart';
+import 'ui/workbench_view.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,8 +52,8 @@ class InboxApp extends StatefulWidget {
   State<InboxApp> createState() => _InboxAppState();
 }
 
-/// 更新页是从哪里进入的——决定关闭后回到桌宠还是控制中心。
-enum _UpdateOrigin { pill, controlCenter }
+/// 更新页是从哪里进入的——决定关闭后回到桌宠还是工作台。
+enum _UpdateOrigin { pill, workbench }
 
 class _InboxAppState extends State<InboxApp> {
   late final SettingsService _settings;
@@ -67,8 +66,7 @@ class _InboxAppState extends State<InboxApp> {
   AppVersion? _currentVersion;
   bool _loading = true;
   bool _showingUpdate = false;
-  bool _showingControlCenter = false;
-  bool _showingReader = false;
+  bool _showingWorkbench = false;
   bool _changingVault = false;
   _UpdateOrigin _updateOrigin = _UpdateOrigin.pill;
 
@@ -94,8 +92,7 @@ class _InboxAppState extends State<InboxApp> {
   void _onNativeWindowClosed() {
     if (!mounted) return;
     setState(() {
-      _showingControlCenter = false;
-      _showingReader = false;
+      _showingWorkbench = false;
       _showingUpdate = false;
       _currentVersion = null;
     });
@@ -158,8 +155,7 @@ class _InboxAppState extends State<InboxApp> {
   Future<void> _onVaultSelected(String path) async {
     setState(() {
       _vaultPath = path;
-      _showingControlCenter = false;
-      _showingReader = false;
+      _showingWorkbench = false;
       _showingUpdate = false;
     });
     if (_isWindows) await _settings.setWindowMode('floating');
@@ -220,7 +216,7 @@ class _InboxAppState extends State<InboxApp> {
         animate: false,
       );
     }
-    // 从控制中心进入：窗口已是 standard 模式，保持当前尺寸只换内容。
+    // 从工作台进入：窗口已是 standard 模式，保持当前尺寸只换内容。
     final version = await _settings.getAppVersion();
     if (!mounted) return;
     setState(() {
@@ -237,8 +233,8 @@ class _InboxAppState extends State<InboxApp> {
       _currentVersion = null;
     });
 
-    if (origin == _UpdateOrigin.controlCenter) {
-      // 回到控制中心，窗口保持 standard 模式与控制中心尺寸。
+    if (origin == _UpdateOrigin.workbench) {
+      // 回到工作台，窗口保持 standard 模式与工作台尺寸。
       return;
     }
 
@@ -259,26 +255,25 @@ class _InboxAppState extends State<InboxApp> {
     }
   }
 
-  // 控制中心：标准 macOS 窗口，桌宠暂时隐藏。
-  Future<void> _openControlCenter() async {
+  // 工作台：标准桌面窗口，桌宠暂时隐藏。
+  Future<void> _openWorkbench() async {
     final path = _vaultPath;
     if (path == null) return;
     // Windows 需要先切换标题栏样式，再按客户区尺寸计算外框。
     if (_isWindows) await _settings.setWindowMode('standard');
     await _settings.setWindowSize(
-      WindowSizes.controlCenterWidth,
-      WindowSizes.controlCenterHeight,
+      WindowSizes.workbenchWidth,
+      WindowSizes.workbenchHeight,
       animate: false,
     );
     if (!_isWindows) await _settings.setWindowMode('standard');
     if (!mounted) return;
-    setState(() => _showingControlCenter = true);
+    setState(() => _showingWorkbench = true);
   }
 
-  Future<void> _closeControlCenter() async {
+  Future<void> _closeWorkbench() async {
     setState(() {
-      _showingControlCenter = false;
-      _showingReader = false;
+      _showingWorkbench = false;
     });
     await _settings.setWindowMode('floating');
     await _settings.setWindowSize(
@@ -286,19 +281,6 @@ class _InboxAppState extends State<InboxApp> {
       WindowSizes.pillHeight,
       animate: false,
     );
-  }
-
-  void _openReader() {
-    _settings.setWindowSize(WindowSizes.readerWidth, WindowSizes.readerHeight);
-    setState(() => _showingReader = true);
-  }
-
-  void _closeReader() {
-    _settings.setWindowSize(
-      WindowSizes.controlCenterWidth,
-      WindowSizes.controlCenterHeight,
-    );
-    setState(() => _showingReader = false);
   }
 
   @override
@@ -335,20 +317,15 @@ class _InboxAppState extends State<InboxApp> {
       );
     }
 
-    if (_showingReader && _vaultPath != null) {
-      return NoteReaderView(vaultPath: _vaultPath!, onBack: _closeReader);
-    }
-
-    if (_showingControlCenter && _vaultPath != null) {
-      return ControlCenterView(
+    if (_showingWorkbench && _vaultPath != null) {
+      return WorkbenchView(
         vaultPath: _vaultPath!,
         settings: _settings,
         storage: _storage,
         display: _display,
         onVaultPathChanged: (p) => setState(() => _vaultPath = p),
-        onCheckUpdates: () => _showUpdates(origin: _UpdateOrigin.controlCenter),
-        onOpenContent: _openReader,
-        onClose: _closeControlCenter,
+        onCheckUpdates: () => _showUpdates(origin: _UpdateOrigin.workbench),
+        onClose: _closeWorkbench,
       );
     }
 
@@ -365,7 +342,7 @@ class _InboxAppState extends State<InboxApp> {
       capture: _capture,
       onChangeVault: _changeVault,
       onCheckUpdates: () => _showUpdates(),
-      onOpenControlCenter: _openControlCenter,
+      onOpenControlCenter: _openWorkbench,
     );
   }
 }
