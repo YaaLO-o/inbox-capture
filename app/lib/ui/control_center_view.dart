@@ -22,6 +22,7 @@ class ControlCenterView extends StatefulWidget {
   final VoidCallback onCheckUpdates;
   final VoidCallback onOpenContent;
   final VoidCallback onClose;
+  final bool embedded;
 
   const ControlCenterView({
     super.key,
@@ -33,6 +34,7 @@ class ControlCenterView extends StatefulWidget {
     required this.onCheckUpdates,
     required this.onOpenContent,
     required this.onClose,
+    this.embedded = false,
   });
 
   @override
@@ -72,14 +74,24 @@ class _ControlCenterViewState extends State<ControlCenterView> {
   }
 
   Future<void> _openContent() async {
+    if (widget.embedded) {
+      widget.onOpenContent();
+      return;
+    }
     final method = await widget.display.load();
     if (!mounted) return;
     if (method == DisplayMethod.inbox) {
       widget.onOpenContent();
       return;
     }
-    final result =
-        await widget.display.openDailyNoteExternally(widget.vaultPath, DateTime.now());
+    await _openDailyExternally();
+  }
+
+  Future<void> _openDailyExternally() async {
+    final result = await widget.display.openDailyNoteExternally(
+      widget.vaultPath,
+      DateTime.now(),
+    );
     if (!mounted) return;
     switch (result) {
       case OpenNoteResult.opened:
@@ -159,6 +171,185 @@ class _ControlCenterViewState extends State<ControlCenterView> {
 
   @override
   Widget build(BuildContext context) {
+    final content = Padding(
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!widget.embedded) ...[
+                    const Text(
+                      '控制中心',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                  _SectionLabel('存储位置'),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2A2A33),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF3A3A45)),
+                    ),
+                    child: SelectableText(
+                      widget.vaultPath,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: Colors.white,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _openFolder,
+                          icon: const Icon(Icons.folder_outlined, size: 16),
+                          label: const Text('打开存储文件夹'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _changingFolder ? null : _changeFolder,
+                          icon: const Icon(Icons.swap_horiz, size: 16),
+                          label: Text(_changingFolder ? '更改中…' : '更改存储文件夹'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_folderError != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      _folderError!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.redAccent,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 22),
+                  _SectionLabel('默认展示方式'),
+                  const SizedBox(height: 8),
+                  if (_loadingPref)
+                    const SizedBox(
+                      height: 40,
+                      child: Center(
+                        child: SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<DisplayMethod>(
+                        segments: const [
+                          ButtonSegment(
+                            value: DisplayMethod.inbox,
+                            label: Text('应用内查看'),
+                            icon: Icon(Icons.visibility_outlined, size: 16),
+                          ),
+                          ButtonSegment(
+                            value: DisplayMethod.system,
+                            label: Text('系统默认'),
+                            icon: Icon(Icons.description_outlined, size: 16),
+                          ),
+                          ButtonSegment(
+                            value: DisplayMethod.obsidian,
+                            label: Text('Obsidian'),
+                            icon: Icon(Icons.hub_outlined, size: 16),
+                          ),
+                        ],
+                        selected: {_method},
+                        onSelectionChanged: (s) => _selectMethod(s.first),
+                      ),
+                    ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    '仅改变查看笔记时使用的应用，不会移动或修改原文件。',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF8A8A96),
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _openContent,
+                          icon: const Icon(Icons.article_outlined, size: 16),
+                          label: const Text('查看内容'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: widget.onCheckUpdates,
+                          icon: const Icon(Icons.system_update_alt, size: 16),
+                          label: const Text('检查更新'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (widget.embedded && _method != DisplayMethod.inbox) ...[
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: _openDailyExternally,
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: const Text('用所选应用打开今日笔记'),
+                    ),
+                  ],
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      FutureBuilder<AppVersion>(
+                        future: _versionFuture,
+                        builder: (context, snap) {
+                          final v = snap.data;
+                          return Text(
+                            v == null ? 'INbox' : 'INbox $v',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              color: Color(0xFF8A8A96),
+                            ),
+                          );
+                        },
+                      ),
+                      if (!widget.embedded)
+                        TextButton(
+                          onPressed: widget.onClose,
+                          child: const Text('返回桌宠'),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    if (widget.embedded) return content;
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -167,186 +358,24 @@ class _ControlCenterViewState extends State<ControlCenterView> {
         colorSchemeSeed: const Color(0xFF43C6AC),
         fontFamily: '.AppleSystemUIFont',
       ),
-      home: Scaffold(
-        backgroundColor: const Color(0xFF1E1E24),
-        body: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 22, 24, 18),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints:
-                      BoxConstraints(minHeight: constraints.maxHeight),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '控制中心',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      _SectionLabel('存储位置'),
-                      const SizedBox(height: 8),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2A2A33),
-                          borderRadius: BorderRadius.circular(10),
-                          border:
-                              Border.all(color: const Color(0xFF3A3A45)),
-                        ),
-                        child: SelectableText(
-                          widget.vaultPath,
-                          style: const TextStyle(
-                            fontSize: 12.5,
-                            color: Colors.white,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: _openFolder,
-                              icon: const Icon(Icons.folder_outlined, size: 16),
-                              label: const Text('打开存储文件夹'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed:
-                                  _changingFolder ? null : _changeFolder,
-                              icon: const Icon(Icons.swap_horiz, size: 16),
-                              label: Text(
-                                _changingFolder ? '更改中…' : '更改存储文件夹',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (_folderError != null) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _folderError!,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.redAccent,
-                          ),
-                        ),
-                      ],
-                      const SizedBox(height: 22),
-                      _SectionLabel('默认展示方式'),
-                      const SizedBox(height: 8),
-                      if (_loadingPref)
-                        const SizedBox(
-                          height: 40,
-                          child: Center(
-                            child: SizedBox.square(
-                              dimension: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
-                        )
-                      else
-                        SizedBox(
-                          width: double.infinity,
-                          child: SegmentedButton<DisplayMethod>(
-                            segments: const [
-                              ButtonSegment(
-                                value: DisplayMethod.inbox,
-                                label: Text('应用内查看'),
-                                icon: Icon(Icons.visibility_outlined, size: 16),
-                              ),
-                              ButtonSegment(
-                                value: DisplayMethod.system,
-                                label: Text('系统默认'),
-                                icon: Icon(Icons.description_outlined,
-                                    size: 16),
-                              ),
-                              ButtonSegment(
-                                value: DisplayMethod.obsidian,
-                                label: Text('Obsidian'),
-                                icon: Icon(Icons.hub_outlined, size: 16),
-                              ),
-                            ],
-                            selected: {_method},
-                            onSelectionChanged: (s) => _selectMethod(s.first),
-                          ),
-                        ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        '仅改变查看笔记时使用的应用，不会移动或修改原文件。',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF8A8A96),
-                          height: 1.5,
-                        ),
-                      ),
-                      const SizedBox(height: 22),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: _openContent,
-                              icon: const Icon(Icons.article_outlined,
-                                  size: 16),
-                              label: const Text('查看内容'),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: FilledButton.tonalIcon(
-                              onPressed: widget.onCheckUpdates,
-                              icon: const Icon(Icons.system_update_alt,
-                                  size: 16),
-                              label: const Text('检查更新'),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          FutureBuilder<AppVersion>(
-                            future: _versionFuture,
-                            builder: (context, snap) {
-                              final v = snap.data;
-                              return Text(
-                                v == null ? 'INbox' : 'INbox $v',
-                                style: const TextStyle(
-                                  fontSize: 11.5,
-                                  color: Color(0xFF8A8A96),
-                                ),
-                              );
-                            },
-                          ),
-                          TextButton(
-                            onPressed: widget.onClose,
-                            child: const Text('返回桌宠'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ),
+      home: Scaffold(backgroundColor: const Color(0xFF1E1E24), body: content),
     );
   }
+}
+
+/// Settings content that can live inside the desktop workbench's main pane.
+class ControlCenterPanel extends ControlCenterView {
+  const ControlCenterPanel({
+    super.key,
+    required super.vaultPath,
+    super.storage,
+    required super.settings,
+    required super.display,
+    required super.onVaultPathChanged,
+    required super.onCheckUpdates,
+    required super.onOpenContent,
+    required super.onClose,
+  }) : super(embedded: true);
 }
 
 class _SectionLabel extends StatelessWidget {

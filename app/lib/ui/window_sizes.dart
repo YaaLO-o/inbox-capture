@@ -12,11 +12,7 @@ class WindowSizes {
   static const updateWidth = 420.0;
   static const updateHeight = 300.0;
 
-  /// 控制中心：标准 macOS 窗口（存储位置、展示方式、检查更新等）。
-  static const controlCenterWidth = 480.0;
-  static const controlCenterHeight = 360.0;
-
-  /// 内置只读查看器：标准 macOS 窗口。
-  static const readerWidth = 640.0;
-  static const readerHeight = 480.0;
+  /// 双栏工作台：最近笔记、只读正文与设置共用一个标准窗口。
+  static const workbenchWidth = 860.0;
+  static const workbenchHeight = 580.0;
 }
