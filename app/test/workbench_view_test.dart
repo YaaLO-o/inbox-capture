@@ -14,6 +14,8 @@ void main() {
   late Directory tmp;
   String? pickedPath;
   String? changedPath;
+  String displayMethod = 'inbox';
+  final calls = <MethodCall>[];
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   const channel = MethodChannel('com.inbox.app/settings');
@@ -22,15 +24,22 @@ void main() {
     tmp = Directory.systemTemp.createTempSync('workbench_view_');
     pickedPath = null;
     changedPath = null;
+    displayMethod = 'inbox';
+    calls.clear();
     messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call);
       switch (call.method) {
         case 'getDisplayMethod':
-          return 'inbox';
+          return displayMethod;
+        case 'setDisplayMethod':
+          displayMethod = (call.arguments as Map)['method'] as String;
+          return null;
         case 'getAppVersion':
           return '1.2.0';
         case 'pickFolder':
           return pickedPath;
         case 'revealPath':
+        case 'openPath':
           return true;
       }
       return null;
@@ -46,7 +55,7 @@ void main() {
         ..createSync(recursive: true)
         ..writeAsStringSync(content);
 
-  Widget workbench() {
+  Widget workbench({List<File> Function(String)? listNotes}) {
     final settings = SettingsService();
     return WorkbenchView(
       vaultPath: tmp.path,
@@ -56,6 +65,7 @@ void main() {
       onCheckUpdates: () {},
       onClose: () {},
       onVaultPathChanged: (path) => changedPath = path,
+      listNotes: listNotes,
     );
   }
 
@@ -165,5 +175,42 @@ void main() {
 
     expect(find.byKey(const Key('sidebar-scrim')), findsNothing);
     expect(find.text('更改存储文件夹'), findsOneWidget);
+  });
+
+  testWidgets('directory listing failure keeps Settings available', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      workbench(
+        listNotes: (_) => throw const FileSystemException('permission denied'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('无法读取笔记目录'), findsOneWidget);
+    await tester.tap(find.text('设置'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining(tmp.path), findsOneWidget);
+  });
+
+  testWidgets('selected external display method can open today in that app', (
+    tester,
+  ) async {
+    final today = DateTime.now();
+    final todayFile = File(VaultPaths.dailyInboxFile(tmp.path, today))
+      ..createSync(recursive: true)
+      ..writeAsStringSync('today');
+    await tester.pumpWidget(workbench());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('设置'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('系统默认'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('用所选应用打开今日笔记'));
+    await tester.pumpAndSettle();
+
+    final opens = calls.where((call) => call.method == 'openPath').toList();
+    expect(opens, hasLength(1));
+    expect(opens.single.arguments, {'path': todayFile.path});
   });
 }

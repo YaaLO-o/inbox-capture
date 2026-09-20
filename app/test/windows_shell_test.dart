@@ -10,6 +10,7 @@ import 'package:inbox_app/models/app_release.dart';
 import 'package:inbox_app/services/update_service.dart';
 import 'package:inbox_app/ui/capture_pill.dart';
 import 'package:inbox_app/ui/workbench_view.dart';
+import 'package:inbox_app/util/path_utils.dart';
 import 'package:inbox_app/ui/onboarding_view.dart';
 import 'package:inbox_app/ui/update_view.dart';
 
@@ -278,6 +279,38 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     },
   );
+
+  windowsTest('update check preserves the selected note and Settings pane', (
+    tester,
+  ) async {
+    File(VaultPaths.dailyInboxFile(root.path, DateTime(2026, 8, 24)))
+      ..createSync(recursive: true)
+      ..writeAsStringSync('older note body');
+    File(VaultPaths.dailyInboxFile(root.path, DateTime(2026, 8, 26)))
+      ..createSync(recursive: true)
+      ..writeAsStringSync('newest note body');
+    final updates = ShellUpdateService();
+    await tester.pumpWidget(InboxApp(updateService: updates));
+    await settle(tester);
+    tester.widget<CapturePill>(find.byType(CapturePill)).onOpenControlCenter();
+    await settle(tester);
+    await tester.tap(find.text('2026-08-24'));
+    await settle(tester);
+    await tester.tap(find.text('设置'));
+    await settle(tester);
+    await tester.tap(find.text('检查更新'));
+    await settle(tester);
+    updates.complete(AppRelease(version: AppVersion.parse('1.2.0')));
+    await settle(tester);
+    tester.widget<UpdateView>(find.byType(UpdateView)).onClose();
+    await settle(tester);
+
+    expect(find.text('更改存储文件夹'), findsOneWidget);
+    await tester.tap(find.text('查看内容'));
+    await settle(tester);
+    expect(find.text('older note body'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
 }
 
 class ShellUpdateService extends UpdateService {

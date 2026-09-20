@@ -84,6 +84,10 @@ class _ControlCenterViewState extends State<ControlCenterView> {
       widget.onOpenContent();
       return;
     }
+    await _openDailyExternally();
+  }
+
+  Future<void> _openDailyExternally() async {
     final result = await widget.display.openDailyNoteExternally(
       widget.vaultPath,
       DateTime.now(),
@@ -306,6 +310,14 @@ class _ControlCenterViewState extends State<ControlCenterView> {
                       ),
                     ],
                   ),
+                  if (widget.embedded && _method != DisplayMethod.inbox) ...[
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: _openDailyExternally,
+                      icon: const Icon(Icons.open_in_new, size: 16),
+                      label: const Text('用所选应用打开今日笔记'),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,

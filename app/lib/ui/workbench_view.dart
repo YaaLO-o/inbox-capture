@@ -24,6 +24,7 @@ class WorkbenchView extends StatefulWidget {
   final VoidCallback onCheckUpdates;
   final VoidCallback onClose;
   final ValueChanged<String> onVaultPathChanged;
+  final List<File> Function(String vaultPath)? listNotes;
 
   const WorkbenchView({
     super.key,
@@ -34,6 +35,7 @@ class WorkbenchView extends StatefulWidget {
     required this.onCheckUpdates,
     required this.onClose,
     required this.onVaultPathChanged,
+    this.listNotes,
   });
 
   @override
@@ -44,6 +46,7 @@ class _WorkbenchViewState extends State<WorkbenchView> {
   late String _vaultPath;
   late List<File> _files;
   File? _selected;
+  String? _listError;
   bool _showSettings = false;
 
   @override
@@ -74,6 +77,16 @@ class _WorkbenchViewState extends State<WorkbenchView> {
   }
 
   List<File> _listFiles(String vaultPath) {
+    _listError = null;
+    try {
+      return (widget.listNotes ?? _scanNotes)(vaultPath);
+    } on FileSystemException catch (error) {
+      _listError = '无法读取笔记目录：$error';
+      return const [];
+    }
+  }
+
+  List<File> _scanNotes(String vaultPath) {
     final dir = Directory(VaultPaths.captureDir(vaultPath));
     if (!dir.existsSync()) return const [];
     final files =
@@ -222,6 +235,17 @@ class _WorkbenchViewState extends State<WorkbenchView> {
   }
 
   Widget _buildNoteBody() {
+    if (_listError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            _listError!,
+            style: const TextStyle(color: Colors.redAccent),
+          ),
+        ),
+      );
+    }
     final file = _selected;
     if (file == null) {
       return const Center(

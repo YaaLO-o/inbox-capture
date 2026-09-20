@@ -299,34 +299,34 @@ class _InboxAppState extends State<InboxApp> {
     }
 
     final currentVersion = _currentVersion;
-    if (_showingUpdate && currentVersion != null) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          brightness: Brightness.dark,
-          useMaterial3: true,
-          colorSchemeSeed: const Color(0xFF43C6AC),
-          fontFamily: '.AppleSystemUIFont',
-        ),
-        home: UpdateView(
-          currentVersion: currentVersion,
-          service: _updates,
-          installer: _settings.installUpdate,
-          onClose: _closeUpdates,
-        ),
+    if (_showingWorkbench && _vaultPath != null) {
+      final updateOverlay = _showingUpdate && currentVersion != null;
+      return Stack(
+        alignment: Alignment.topLeft,
+        children: [
+          Positioned.fill(
+            child: Offstage(
+              offstage: updateOverlay,
+              child: WorkbenchView(
+                vaultPath: _vaultPath!,
+                settings: _settings,
+                storage: _storage,
+                display: _display,
+                onVaultPathChanged: (p) => setState(() => _vaultPath = p),
+                onCheckUpdates: () =>
+                    _showUpdates(origin: _UpdateOrigin.workbench),
+                onClose: _closeWorkbench,
+              ),
+            ),
+          ),
+          if (updateOverlay)
+            Positioned.fill(child: _buildUpdateView(currentVersion)),
+        ],
       );
     }
 
-    if (_showingWorkbench && _vaultPath != null) {
-      return WorkbenchView(
-        vaultPath: _vaultPath!,
-        settings: _settings,
-        storage: _storage,
-        display: _display,
-        onVaultPathChanged: (p) => setState(() => _vaultPath = p),
-        onCheckUpdates: () => _showUpdates(origin: _UpdateOrigin.workbench),
-        onClose: _closeWorkbench,
-      );
+    if (_showingUpdate && currentVersion != null) {
+      return _buildUpdateView(currentVersion);
     }
 
     final path = _vaultPath;
@@ -343,6 +343,24 @@ class _InboxAppState extends State<InboxApp> {
       onChangeVault: _changeVault,
       onCheckUpdates: () => _showUpdates(),
       onOpenControlCenter: _openWorkbench,
+    );
+  }
+
+  Widget _buildUpdateView(AppVersion currentVersion) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        useMaterial3: true,
+        colorSchemeSeed: const Color(0xFF43C6AC),
+        fontFamily: '.AppleSystemUIFont',
+      ),
+      home: UpdateView(
+        currentVersion: currentVersion,
+        service: _updates,
+        installer: _settings.installUpdate,
+        onClose: _closeUpdates,
+      ),
     );
   }
 }
